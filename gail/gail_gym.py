@@ -1,4 +1,5 @@
 import argparse
+import logging
 import gym
 import os
 import sys
@@ -61,13 +62,15 @@ parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='interval between training status logs (default: 10)')
 parser.add_argument('--save-model-interval', type=int, default=0, metavar='N',
                     help="interval between saving model (default: 0, means don't save)")
-parser.add_argument('--multiprocessing', default=False, metavar='N',
-                    help="interval between saving model (default: 0, means don't save)")
+parser.add_argument('--multiprocessing', action='store_true', default=False,
+                    help="Sets multiprocessing to true")
 parser.add_argument('--gpu-index', type=int, default=0, metavar='N')
 parser.add_argument('--model-path', metavar='G',
                     help='path of pre-trained model')
 parser.add_argument('--no-wandb', action='store_true', default=False,
                     help='log run on weights & biases')
+parser.add_argument('--pre-train', action='store_true', default=False,
+                    help='pretrains the policy from imitation learning on orca')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
@@ -223,9 +226,10 @@ def main_loop():
                 i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward'], log_eval['avg_c_reward'], log_eval['avg_reward']))
         
         log_combine = {**log, **log_eval}
-        if not args.no_wandb: wandb.log(log_combine)
+        if not args.no_wandb: wandb.log(log_combine)        
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
+            print('Saving model to: ' + os.path.join(assets_dir(), 'learned_models/{}_gail{}.p'.format(args.env_name, i_iter+1)))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
             pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(), 'learned_models/{}_gail{}.p'.format(args.env_name, i_iter+1)), 'wb'))
             to_device(device, policy_net, value_net, discrim_net)

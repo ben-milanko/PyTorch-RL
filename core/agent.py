@@ -56,9 +56,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             mask = 0 if done else 1
 
             memory.push(state, action, mask, next_state, reward)
-            # print(state, action)
-            # if render:
-            #     env.render()
+
             if done:
                 if render:
                     env.render()

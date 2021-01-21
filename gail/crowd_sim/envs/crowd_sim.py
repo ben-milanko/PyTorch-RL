@@ -519,8 +519,13 @@ class CrowdSim(gym.Env):
                     ax.add_artist(human_numbers[i])
 
             # add time annotation
-            time = plt.text(0.4, 0.9, 'Time: {}'.format(0), fontsize=16, transform=ax.transAxes)
+            time = plt.text(0.4, 0.95, 'Time: {}'.format(0), fontsize=16, transform=ax.transAxes)
+            reward = plt.text(0.01, 0.95, 'Reward: {}'.format(0), fontsize=16, transform=ax.transAxes)
+            reward_sum = plt.text(0.01, 0.9, 'Reward Sum: {}'.format(0), fontsize=16, transform=ax.transAxes)
+
             ax.add_artist(time)
+            ax.add_artist(reward)
+            ax.add_artist(reward_sum)
 
             # visualize attention scores
             # if hasattr(self.robot.policy, 'get_attention_weights'):
@@ -601,6 +606,8 @@ class CrowdSim(gym.Env):
                     #     attention_scores[i].set_text('human {}: {:.2f}'.format(i, self.attention_weights[frame_num][i]))
 
                 time.set_text('Time: {:.2f}'.format(frame_num * self.time_step))
+                reward.set_text('Reward: {:.2f}'.format(self.rewards[frame_num]))
+                reward_sum.set_text('Reward Sum: {:.2f}'.format(sum(self.rewards[0:frame_num])))
 
                 if len(self.trajs) != 0:
                     for i, circles in enumerate(human_future_circles):
