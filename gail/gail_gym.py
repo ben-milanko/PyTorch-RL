@@ -125,15 +125,19 @@ if args.model_path is None:
     else:
         policy_net = Policy(state_dim, env.action_space.shape[0], log_std=args.log_std)
     value_net = Value(state_dim)
+    discrim_net = Discriminator(state_dim + action_dim)
 else:
     policy_net, value_net, discrim_net = pickle.load(open(args.model_path, "rb"))
 
 robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
 
-
-# value_net = Value(state_dim)
-discrim_net = Discriminator(state_dim + action_dim)
 discrim_criterion = nn.BCELoss()
+
+if not args.no_wandb: 
+    wandb.watch(policy_net)
+    wandb.watch(value_net)
+    wandb.watch(discrim_net)
+
 to_device(device, policy_net, value_net, discrim_net, discrim_criterion)
 
 optimizer_policy = torch.optim.Adam(policy_net.parameters(), lr=args.learning_rate)

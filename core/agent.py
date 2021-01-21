@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 def collect_samples(pid, queue, env, policy, custom_reward,
-                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter, max_v):
+                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter):
     if pid > 0:
         torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
         if hasattr(env, 'np_random'):

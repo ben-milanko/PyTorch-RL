@@ -21,3 +21,5 @@ utils/__pycache__/
 wandb/
 
 assets/
+
+.vscode/
