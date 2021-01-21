@@ -82,45 +82,18 @@ if torch.cuda.is_available():
     torch.cuda.set_device(args.gpu_index)
 
 """environment"""
-# env = CrowdSim()
-# config_file = "/home/rhys/PyTorch-RL/gail/crowd_sim/configs/icra_benchmark/gail.py"
-# spec = importlib.util.spec_from_file_location('config', config_file)
-# if spec is None:
-#     parser.error('Config file not found.')
+if args.env_name == 'CrowdSim-v0':
+    env = CrowdSim()
+    env_config = gail.EnvConfig(True)
+    env.configure(env_config)
+    robot = Robot(env_config, 'robot')
+    robot.time_step = env.time_step
+    #robot.set_policy(policy)
+    robot = BasicRobot()
 
-# config = importlib.util.module_from_spec(spec)
-
-# env_dict = gym.envs.registration.registry.env_specs.copy()
-# for env in env_dict:
-#     if 'CrowdSim' in env:
-#         print("Remove {} from registry".format(env))
-#         del gym.envs.registration.registry.env_specs[env]
-#         break
-# print(config)
-# spec.loader.exec_module(config)
-# dir(config)
-# print(dir(config))
-
-# # policy_config = gail.PolicyConfig()
-# policy = policy_factory[policy_config.name]()
-# if not policy.trainable:
-#     parser.error('Policy has to be trainable')
-# policy.configure(policy_config)
-# policy.set_device(device)
-
-
-env = CrowdSim() #gym.make("CrowdSim-v0")
-# 
-env_config = gail.EnvConfig(True)
-# env = gym.make('CrowdSim-v0')
-env.configure(env_config)
-# robot = Robot(env_config, 'robot')
-# robot.time_step = env.time_step
-# robot.set_policy(policy)
-robot = BasicRobot()
-
-env.set_robot(robot)
-
+    env.set_robot(robot)
+else:
+    gym.make(args.env_name)
 
 state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
@@ -171,10 +144,6 @@ optim_batch_size = 64
 # expert_traj, running_state = pickle.load(open("/home/rhys/CrowdNavigation/PyTorch-RL/assets/expert_traj/Hopper-v2_expert_traj.p", "rb"))
 expert_traj = pickle.load(open("expert_traj.p", "rb"))
 
-# print(expert_traj.shape)
-# print(expert_traj[0])
-# expert_traj = np.ndarray(expert_traj)
-
 
 def expert_reward(state, action):
     state_action = tensor(np.hstack([state, action]), dtype=dtype)
@@ -188,10 +157,6 @@ agent = Agent(env, policy_net, device, custom_reward=expert_reward,
 
 
 def update_params(batch, i_iter):
-    # states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
-    # actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
-    # rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
-    # masks = torch.from_numpy(np.stack(batch.mask)).to(dtype).to(device)
     states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
     actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
     rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
@@ -205,16 +170,7 @@ def update_params(batch, i_iter):
 
     """update discriminator"""
     for _ in range(1):
-
-        # expert_state_actions = torch.from_numpy(expert_traj).to(device)
         expert_state_actions = torch.from_numpy(expert_traj).to(dtype).to(device)
-        # test = torch.cat([states, actions], 1)
-        # print(test)
-        # print(test.shape)
-        # print(expert_state_actions.shape)
-
-        # input()
-        # expert_state_actions = torch.from_numpy(expert_traj).to(dtype).to(device)
         g_o = discrim_net(torch.cat([states, actions], 1))
         e_o = discrim_net(expert_state_actions)
         optimizer_discrim.zero_grad()
@@ -271,7 +227,7 @@ def main_loop():
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
-            pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(), 'learned_models/{}_gail.p'.format(args.env_name)), 'wb'))
+            pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(), 'learned_models/{}_gail{}.p'.format(args.env_name, i_iter+1)), 'wb'))
             to_device(device, policy_net, value_net, discrim_net)
 
         """clean up gpu memory"""
