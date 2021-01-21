@@ -36,6 +36,8 @@ parser.add_argument('--expert-traj-path', metavar='G',
                     help='path of the expert trajectories')
 parser.add_argument('--render', action='store_true', default=False,
                     help='render the environment')
+parser.add_argument('--save-render', action='store_true', default=False,
+                    help='Save and log the runs as gifs')
 parser.add_argument('--log-std', type=float, default=-0.0, metavar='G',
                     help='log std for the policy (default: -0.0)')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -44,6 +46,8 @@ parser.add_argument('--tau', type=float, default=0.95, metavar='G',
                     help='gae (default: 0.95)')
 parser.add_argument('--l2-reg', type=float, default=1e-3, metavar='G',
                     help='l2 regularization regression (default: 1e-3)')
+parser.add_argument('--max-reward', type=float, default=1e6, metavar='G',
+                    help='Limits reward per step and cumulative reward (default: 1e6)')
 parser.add_argument('--learning-rate', type=float, default=3e-4, metavar='G',
                     help='gae (default: 3e-4)')
 parser.add_argument('--clip-epsilon', type=float, default=0.2, metavar='N',
@@ -69,13 +73,15 @@ parser.add_argument('--model-path', metavar='G',
                     help='path of pre-trained model')
 parser.add_argument('--no-wandb', action='store_true', default=False,
                     help='log run on weights & biases')
-parser.add_argument('--pre-train', action='store_true', default=False,
-                    help='pretrains the policy from imitation learning on orca')
+# parser.add_argument('--pre-train', action='store_true', default=False,
+#                     help='pretrains the policy from imitation learning on orca')
+parser.add_argument('--wandb-description', default='', metavar='G',
+                    help='description to append to wandb run title')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 
-if not args.no_wandb: wandb.init(project='crowd_rl', name=f'gail_steps_{args.max_iter_num}_expert_{expert_name}',)
+if not args.no_wandb: wandb.init(project='crowd_rl', name=f'gail_steps_{args.max_iter_num}_{expert_name}_{args.wandb_description}',)
 
 
 dtype = torch.float64
@@ -85,6 +91,8 @@ if torch.cuda.is_available():
     torch.cuda.set_device(args.gpu_index)
 
 """environment"""
+env = None
+robot = None
 if args.env_name == 'CrowdSim-v0':
     env = CrowdSim()
     env_config = gail.EnvConfig(True)
@@ -120,11 +128,6 @@ if args.model_path is None:
 else:
     policy_net, value_net, discrim_net = pickle.load(open(args.model_path, "rb"))
 
-# if is_disc_action:
-#     policy_net = DiscretePolicy(state_dim, env.action_space.n)
-# else:
-#     policy_net = Policy(state_dim, env.action_space.shape[0], log_std=args.log_std)
-
 robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
 
 
@@ -156,7 +159,7 @@ def expert_reward(state, action):
 
 """create agent"""
 agent = Agent(env, policy_net, device, custom_reward=expert_reward,
-              running_state=running_state, num_threads=args.num_threads)
+              running_state=running_state, num_threads=args.num_threads, max_reward=args.max_reward)
 
 
 def update_params(batch, i_iter):
@@ -207,21 +210,16 @@ def main_loop():
         discrim_net.to(torch.device('cpu'))
         batch, log = agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing)
         discrim_net.to(device)
-        # print("collected minimum batch")
         t0 = time.time()
         update_params(batch, i_iter)
-        # print("updated params")
         t1 = time.time()
         """evaluate with determinstic action (remove noise for exploration)"""
         discrim_net.to(torch.device('cpu'))
-        # print("moved to cpu")
-        _, log_eval = agent.collect_samples(args.eval_batch_size, multiprocessing=args.multiprocessing, mean_action=True) #mean_action=True
-        # print("samples done")
+        _, log_eval = agent.collect_samples(args.eval_batch_size, multiprocessing=args.multiprocessing, mean_action=True)
         discrim_net.to(device)
-        # print("back to gpu")
         t2 = time.time()
 
-        if True: #i_iter % args.log_interval == 0:
+        if i_iter % args.log_interval == 0:
             print('{}\tT_sample {:.4f}\tT_update {:.4f}\ttrain_discrim_R_avg {:.2f}\ttrain_R_avg {:.2f}\teval_discrim_R_avg {:.2f}\teval_R_avg {:.2f}'.format(
                 i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward'], log_eval['avg_c_reward'], log_eval['avg_reward']))
         
@@ -229,10 +227,17 @@ def main_loop():
         if not args.no_wandb: wandb.log(log_combine)        
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
-            print('Saving model to: ' + os.path.join(assets_dir(), 'learned_models/{}_gail{}.p'.format(args.env_name, i_iter+1)))
+            if args.save_render:
+                print(f'Saving renders to: assets/renders/episode_{i_iter+1}')
+                agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing, save_render=True, iter=i_iter+1)
+                if not args.no_wandb: wandb.log({f'episode_{i_iter+1}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i}.gif', fps=12, format="gif") for i in range(5)]})
+            print('Saving model to: ' + os.path.join(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p'))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
-            pickle.dump((policy_net, value_net, discrim_net), open(os.path.join(assets_dir(), 'learned_models/{}_gail{}.p'.format(args.env_name, i_iter+1)), 'wb'))
+            pickle.dump((policy_net, value_net, discrim_net), open(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p', 'wb'))
             to_device(device, policy_net, value_net, discrim_net)
+
+            if not args.no_wandb: wandb.save(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p')
+
 
         """clean up gpu memory"""
         torch.cuda.empty_cache()

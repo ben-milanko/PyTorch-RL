@@ -3,10 +3,11 @@ from utils.replay_memory import Memory
 from utils.torch import *
 import math
 import time
-
+import os
+import numpy as np
 
 def collect_samples(pid, queue, env, policy, custom_reward,
-                    mean_action, render, running_state, min_batch_size):
+                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter, max_v):
     if pid > 0:
         torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
         if hasattr(env, 'np_random'):
@@ -17,52 +18,69 @@ def collect_samples(pid, queue, env, policy, custom_reward,
     memory = Memory()
     num_steps = 0
     total_reward = 0
-    min_reward = 1e6
-    max_reward = -1e6
+    min_reward = max_reward
+    max_reward = -max_reward
     total_c_reward = 0
-    min_c_reward = 1e6
-    max_c_reward = -1e6
+    min_c_reward = max_reward
+    max_c_reward = -max_reward
     num_episodes = 0
+
+    if save_render: 
+        if not os.path.exists(f'assets/renders/episode_{iter}'):
+            os.mkdir(f'assets/renders/episode_{iter}')
 
     while num_steps < min_batch_size:
 
         state = env.reset()
-        # print([print(s) for s in state])
-        # print(running_state)
         if running_state is not None:
             state = running_state(state)
         reward_episode = 0
 
         for t in range(10000):
             state_var = tensor(state).unsqueeze(0)
-            # print(state_var.shape)
             with torch.no_grad():
                 if mean_action:
                     action = policy(state_var)[0][0].numpy()
                 else:
                     action = policy.select_action(state_var)[0].numpy()
             action = int(action) if policy.is_disc_action else action.astype(np.float64)
+            
+            action_magnitude = np.sqrt(action[0] ** 2 + action[0] ** 2)
+            # Clamping the action
+            if action_magnitude > 1:
+                action[0] = action[0]/action_magnitude
+                action[1] = action[1]/action_magnitude
+
             next_state, reward, done, _ = env.step(action)
             reward_episode += reward
-            if running_state is not None:
-                next_state = running_state(next_state)
 
-            if custom_reward is not None:
-                reward = custom_reward(state, action)
-                total_c_reward += reward
-                min_c_reward = min(min_c_reward, reward)
-                max_c_reward = max(max_c_reward, reward)
+            if not save_render:
+                if running_state is not None:
+                    next_state = running_state(next_state)
 
-            mask = 0 if done else 1
+                if custom_reward is not None:
+                    #reward = custom_reward(state, action)
+                    reward = custom_reward(state, action) + reward
 
-            memory.push(state, action, mask, next_state, reward)
+                    total_c_reward += reward
+                    min_c_reward = min(min_c_reward, reward)
+                    max_c_reward = max(max_c_reward, reward)
+
+                mask = 0 if done else 1
+
+                memory.push(state, action, mask, next_state, reward)
 
             if done:
+                if save_render:
+                    output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes}.gif', 'wb')
+                    env.render(output_file=output_file)
                 if render:
                     env.render()
                 break
 
             state = next_state
+            if save_render and num_episodes == 5:
+                return
 
         # log stats
         num_steps += (t + 1)
@@ -70,6 +88,8 @@ def collect_samples(pid, queue, env, policy, custom_reward,
         total_reward += reward_episode
         min_reward = min(min_reward, reward_episode)
         max_reward = max(max_reward, reward_episode)
+    
+
 
     log['num_steps'] = num_steps
     log['num_episodes'] = num_episodes
@@ -108,15 +128,18 @@ def merge_log(log_list):
 
 class Agent:
 
-    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1):
+    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1, max_reward = 1e6):
         self.env = env
         self.policy = policy
         self.device = device
         self.custom_reward = custom_reward
         self.running_state = running_state
         self.num_threads = num_threads
+        self.max_reward = max_reward
 
-    def collect_samples(self, min_batch_size, mean_action=False, render=False, multiprocessing=True):
+    def collect_samples(self, min_batch_size, mean_action=False, render=False, multiprocessing=True, save_render = False, iter=None):
+        log = None
+        batch = None
         t_start = time.time()
         to_device(torch.device('cpu'), self.policy)
         if multiprocessing:
@@ -132,7 +155,7 @@ class Agent:
                 worker.start()
 
             memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                                        render, self.running_state, thread_batch_size)
+                                        render, self.running_state, thread_batch_size, self.max_reward, save_render, iter=iter)
 
             worker_logs = [None] * len(workers)
             worker_memories = [None] * len(workers)
@@ -157,17 +180,19 @@ class Agent:
 
             to_device(torch.device('cpu'), self.policy)
 
-            memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                            render, self.running_state, min_batch_size)
+            if not save_render:
+                memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
+                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter)
+                to_device(self.device, self.policy)
+                t_end = time.time()
+                batch = memory.sample()
 
-            to_device(self.device, self.policy)
-            t_end = time.time()
-            batch = memory.sample()
-
-            log['sample_time'] = t_end - t_start
-            log['action_mean'] = np.mean(np.vstack(batch.action), axis=0)
-            log['action_min'] = np.min(np.vstack(batch.action), axis=0)
-            log['action_max'] = np.max(np.vstack(batch.action), axis=0)
-
+                log['sample_time'] = t_end - t_start
+                log['action_mean'] = np.mean(np.vstack(batch.action), axis=0)
+                log['action_min'] = np.min(np.vstack(batch.action), axis=0)
+                log['action_max'] = np.max(np.vstack(batch.action), axis=0)
+            else:
+                collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
+                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter)
 
         return batch, log

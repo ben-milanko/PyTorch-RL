@@ -236,6 +236,7 @@ class CrowdSim(gym.Env):
 
         self.states = list()
         self.robot_actions = list()
+        self.robot_v = list()
         self.rewards = list()
         if hasattr(self.robot.policy, 'action_values'):
             self.action_values = list()
@@ -354,11 +355,10 @@ class CrowdSim(gym.Env):
             if hasattr(self.robot.policy, 'traj'):
                 self.trajs.append(self.robot.policy.get_traj())
 
-            # update all agents
-            # print(action)
+            # update all agents            
             self.robot.step(action)
-            for human, action in zip(self.humans, human_actions):
-                human.step(action)
+            for human, action_human in zip(self.humans, human_actions):
+                human.step(action_human)
                 if self.nonstop_human and human.reached_destination():
                     self.generate_human(human)
 
@@ -366,7 +366,10 @@ class CrowdSim(gym.Env):
             self.states.append([self.robot.get_full_state(), [human.get_full_state() for human in self.humans],
                                 [human.id for human in self.humans]])
             self.robot_actions.append(action)
+            self.robot_v.append([self.robot.vx, self.robot.vy])
             self.rewards.append(reward)
+            # print(action)
+            # print(self.robot_actions[-1])
 
             # compute the observation
             if self.robot.sensor == 'coordinates':
@@ -437,7 +440,7 @@ class CrowdSim(gym.Env):
                 if k % 4 == 0 or k == len(self.states) - 1:
                     robot = plt.Circle(robot_positions[k], self.robot.radius, fill=False, color=robot_color)
                     humans = [plt.Circle(human_positions[k][i], self.humans[i].radius, fill=False, color=cmap(i))
-                              for i in range(len(self.humans))]
+                              for i in range(custom_rewardlen(self.humans))]
                     ax.add_artist(robot)
                     for human in humans:
                         ax.add_artist(human)
@@ -522,10 +525,12 @@ class CrowdSim(gym.Env):
             time = plt.text(0.4, 0.95, 'Time: {}'.format(0), fontsize=16, transform=ax.transAxes)
             reward = plt.text(0.01, 0.95, 'Reward: {}'.format(0), fontsize=16, transform=ax.transAxes)
             reward_sum = plt.text(0.01, 0.9, 'Reward Sum: {}'.format(0), fontsize=16, transform=ax.transAxes)
+            action = plt.text(0.01, 0.85, 'Action: [{},{}]'.format(0,0), fontsize=16, transform=ax.transAxes)
 
             ax.add_artist(time)
             ax.add_artist(reward)
             ax.add_artist(reward_sum)
+            ax.add_artist(action)
 
             # visualize attention scores
             # if hasattr(self.robot.policy, 'get_attention_weights'):
@@ -608,6 +613,7 @@ class CrowdSim(gym.Env):
                 time.set_text('Time: {:.2f}'.format(frame_num * self.time_step))
                 reward.set_text('Reward: {:.2f}'.format(self.rewards[frame_num]))
                 reward_sum.set_text('Reward Sum: {:.2f}'.format(sum(self.rewards[0:frame_num])))
+                action.set_text('Action: [{:.2f},{:.2f}]'.format(self.robot_v[frame_num][0],self.robot_v[frame_num][1]))
 
                 if len(self.trajs) != 0:
                     for i, circles in enumerate(human_future_circles):
@@ -681,14 +687,17 @@ class CrowdSim(gym.Env):
             anim = animation.FuncAnimation(fig, update, frames=len(self.states), interval=self.time_step * 500)
             anim.running = True
 
+            # output_file = open('assets/test.gif', 'wb')
+
             if output_file is not None:
                 # save as video
-                ffmpeg_writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'), bitrate=1800)
+                # ffmpeg_writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'), bitrate=1800)
                 # writer = ffmpeg_writer(fps=10, metadata=dict(artist='Me'), bitrate=1800)
-                anim.save(output_file, writer=ffmpeg_writer)
+                #anim.save(output_file, writer=ffmpeg_writer)
 
                 # save output file as gif if imagemagic is installed
-                # anim.save(output_file, writer='imagemagic', fps=12)
+                anim.save(output_file, writer='imagemagic', fps=12)
+                output_file.close()
             else:
                 plt.show()
         else:
