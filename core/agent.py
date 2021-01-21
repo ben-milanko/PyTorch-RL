@@ -7,7 +7,12 @@ import time
 
 def collect_samples(pid, queue, env, policy, custom_reward,
                     mean_action, render, running_state, min_batch_size):
-    torch.randn(pid)
+    if pid > 0:
+        torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
+        if hasattr(env, 'np_random'):
+            env.np_random.seed(env.np_random.randint(5000) * pid)
+        if hasattr(env, 'env') and hasattr(env.env, 'np_random'):
+            env.env.np_random.seed(env.env.np_random.randint(5000) * pid)
     log = dict()
     memory = Memory()
     num_steps = 0
@@ -20,13 +25,17 @@ def collect_samples(pid, queue, env, policy, custom_reward,
     num_episodes = 0
 
     while num_steps < min_batch_size:
+
         state = env.reset()
+        # print([print(s) for s in state])
+        # print(running_state)
         if running_state is not None:
             state = running_state(state)
         reward_episode = 0
 
         for t in range(10000):
             state_var = tensor(state).unsqueeze(0)
+            # print(state_var.shape)
             with torch.no_grad():
                 if mean_action:
                     action = policy(state_var)[0][0].numpy()
@@ -47,10 +56,12 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             mask = 0 if done else 1
 
             memory.push(state, action, mask, next_state, reward)
-
-            if render:
-                env.render()
+            # print(state, action)
+            # if render:
+            #     env.render()
             if done:
+                if render:
+                    env.render()
                 break
 
             state = next_state
@@ -99,50 +110,66 @@ def merge_log(log_list):
 
 class Agent:
 
-    def __init__(self, env, policy, device, custom_reward=None,
-                 mean_action=False, render=False, running_state=None, num_threads=1):
+    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1):
         self.env = env
         self.policy = policy
         self.device = device
         self.custom_reward = custom_reward
-        self.mean_action = mean_action
         self.running_state = running_state
-        self.render = render
         self.num_threads = num_threads
 
-    def collect_samples(self, min_batch_size):
+    def collect_samples(self, min_batch_size, mean_action=False, render=False, multiprocessing=True):
         t_start = time.time()
         to_device(torch.device('cpu'), self.policy)
-        thread_batch_size = int(math.floor(min_batch_size / self.num_threads))
-        queue = multiprocessing.Queue()
-        workers = []
+        if multiprocessing:
+            thread_batch_size = int(math.floor(min_batch_size / self.num_threads))
+            queue = multiprocessing.Queue()
+            workers = []
 
-        for i in range(self.num_threads-1):
-            worker_args = (i+1, queue, self.env, self.policy, self.custom_reward, self.mean_action,
-                           False, self.running_state, thread_batch_size)
-            workers.append(multiprocessing.Process(target=collect_samples, args=worker_args))
-        for worker in workers:
-            worker.start()
+            for i in range(self.num_threads-1):
+                worker_args = (i+1, queue, self.env, self.policy, self.custom_reward, mean_action,
+                            False, self.running_state, thread_batch_size)
+                workers.append(multiprocessing.Process(target=collect_samples, args=worker_args))
+            for worker in workers:
+                worker.start()
 
-        memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, self.mean_action,
-                                      self.render, self.running_state, thread_batch_size)
+            memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
+                                        render, self.running_state, thread_batch_size)
 
-        worker_logs = [None] * len(workers)
-        worker_memories = [None] * len(workers)
-        for _ in workers:
-            pid, worker_memory, worker_log = queue.get()
-            worker_memories[pid - 1] = worker_memory
-            worker_logs[pid - 1] = worker_log
-        for worker_memory in worker_memories:
-            memory.append(worker_memory)
-        batch = memory.sample()
-        if self.num_threads > 1:
-            log_list = [log] + worker_logs
-            log = merge_log(log_list)
-        to_device(self.device, self.policy)
-        t_end = time.time()
-        log['sample_time'] = t_end - t_start
-        log['action_mean'] = np.mean(np.vstack(batch.action), axis=0)
-        log['action_min'] = np.min(np.vstack(batch.action), axis=0)
-        log['action_max'] = np.max(np.vstack(batch.action), axis=0)
+            worker_logs = [None] * len(workers)
+            worker_memories = [None] * len(workers)
+            for _ in workers:
+                pid, worker_memory, worker_log = queue.get()
+                worker_memories[pid - 1] = worker_memory
+                worker_logs[pid - 1] = worker_log
+            for worker_memory in worker_memories:
+                memory.append(worker_memory)
+            batch = memory.sample()
+            if self.num_threads > 1:
+                log_list = [log] + worker_logs
+                log = merge_log(log_list)
+            to_device(self.device, self.policy)
+            t_end = time.time()
+            log['sample_time'] = t_end - t_start
+            log['action_mean'] = np.mean(np.vstack(batch.action), axis=0)
+            log['action_min'] = np.min(np.vstack(batch.action), axis=0)
+            log['action_max'] = np.max(np.vstack(batch.action), axis=0)
+        else:
+            t_start = time.time()
+
+            to_device(torch.device('cpu'), self.policy)
+
+            memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
+                            render, self.running_state, min_batch_size)
+
+            to_device(self.device, self.policy)
+            t_end = time.time()
+            batch = memory.sample()
+
+            log['sample_time'] = t_end - t_start
+            log['action_mean'] = np.mean(np.vstack(batch.action), axis=0)
+            log['action_min'] = np.min(np.vstack(batch.action), axis=0)
+            log['action_max'] = np.max(np.vstack(batch.action), axis=0)
+
+
         return batch, log

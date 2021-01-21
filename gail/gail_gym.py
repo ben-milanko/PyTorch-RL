@@ -4,6 +4,9 @@ import os
 import sys
 import pickle
 import time
+import importlib
+import wandb
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils import *
@@ -16,9 +19,17 @@ from core.ppo import ppo_step
 from core.common import estimate_advantages
 from core.agent import Agent
 
+from crowd_sim.envs.utils.agent import BasicRobot
+# from crowd_sim.envs.policy.policy_factory import policy_factory
+from crowd_sim.configs.icra_benchmark import gail
+
+from crowd_sim.envs.utils.robot import Robot
+
+from crowd_sim.envs.crowd_sim import CrowdSim
+
 
 parser = argparse.ArgumentParser(description='PyTorch GAIL example')
-parser.add_argument('--env-name', default="Hopper-v2", metavar='G',
+parser.add_argument('--env-name', default="CrowdSim-v0", metavar='G',
                     help='name of the environment to run')
 parser.add_argument('--expert-traj-path', metavar='G',
                     help='path of the expert trajectories')
@@ -42,14 +53,27 @@ parser.add_argument('--seed', type=int, default=1, metavar='N',
                     help='random seed (default: 1)')
 parser.add_argument('--min-batch-size', type=int, default=2048, metavar='N',
                     help='minimal batch size per PPO update (default: 2048)')
+parser.add_argument('--eval-batch-size', type=int, default=2048, metavar='N',
+                    help='minimal batch size for evaluation (default: 2048)')
 parser.add_argument('--max-iter-num', type=int, default=500, metavar='N',
                     help='maximal number of main iterations (default: 500)')
 parser.add_argument('--log-interval', type=int, default=1, metavar='N',
                     help='interval between training status logs (default: 10)')
 parser.add_argument('--save-model-interval', type=int, default=0, metavar='N',
                     help="interval between saving model (default: 0, means don't save)")
+parser.add_argument('--multiprocessing', default=False, metavar='N',
+                    help="interval between saving model (default: 0, means don't save)")
 parser.add_argument('--gpu-index', type=int, default=0, metavar='N')
+parser.add_argument('--model-path', metavar='G',
+                    help='path of pre-trained model')
+parser.add_argument('--no-wandb', action='store_true', default=False,
+                    help='log run on weights & biases')
 args = parser.parse_args()
+
+expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
+
+if not args.no_wandb: wandb.init(project='crowd_rl', name=f'gail_steps_{args.max_iter_num}_expert_{expert_name}',)
+
 
 dtype = torch.float64
 torch.set_default_dtype(dtype)
@@ -58,11 +82,50 @@ if torch.cuda.is_available():
     torch.cuda.set_device(args.gpu_index)
 
 """environment"""
-env = gym.make(args.env_name)
+# env = CrowdSim()
+# config_file = "/home/rhys/PyTorch-RL/gail/crowd_sim/configs/icra_benchmark/gail.py"
+# spec = importlib.util.spec_from_file_location('config', config_file)
+# if spec is None:
+#     parser.error('Config file not found.')
+
+# config = importlib.util.module_from_spec(spec)
+
+# env_dict = gym.envs.registration.registry.env_specs.copy()
+# for env in env_dict:
+#     if 'CrowdSim' in env:
+#         print("Remove {} from registry".format(env))
+#         del gym.envs.registration.registry.env_specs[env]
+#         break
+# print(config)
+# spec.loader.exec_module(config)
+# dir(config)
+# print(dir(config))
+
+# # policy_config = gail.PolicyConfig()
+# policy = policy_factory[policy_config.name]()
+# if not policy.trainable:
+#     parser.error('Policy has to be trainable')
+# policy.configure(policy_config)
+# policy.set_device(device)
+
+
+env = CrowdSim() #gym.make("CrowdSim-v0")
+# 
+env_config = gail.EnvConfig(True)
+# env = gym.make('CrowdSim-v0')
+env.configure(env_config)
+# robot = Robot(env_config, 'robot')
+# robot.time_step = env.time_step
+# robot.set_policy(policy)
+robot = BasicRobot()
+
+env.set_robot(robot)
+
+
 state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
 action_dim = 1 if is_disc_action else env.action_space.shape[0]
-running_state = ZFilter((state_dim,), clip=5)
+running_state = None #ZFilter((state_dim,), clip=5)
 # running_reward = ZFilter((1,), demean=False, clip=10)
 
 """seeding"""
@@ -71,11 +134,25 @@ torch.manual_seed(args.seed)
 env.seed(args.seed)
 
 """define actor and critic"""
-if is_disc_action:
-    policy_net = DiscretePolicy(state_dim, env.action_space.n)
+"""define actor and critic"""
+if args.model_path is None:
+    if is_disc_action:
+        policy_net = DiscretePolicy(state_dim, env.action_space.n)
+    else:
+        policy_net = Policy(state_dim, env.action_space.shape[0], log_std=args.log_std)
+    value_net = Value(state_dim)
 else:
-    policy_net = Policy(state_dim, env.action_space.shape[0], log_std=args.log_std)
-value_net = Value(state_dim)
+    policy_net, value_net, discrim_net = pickle.load(open(args.model_path, "rb"))
+
+# if is_disc_action:
+#     policy_net = DiscretePolicy(state_dim, env.action_space.n)
+# else:
+#     policy_net = Policy(state_dim, env.action_space.shape[0], log_std=args.log_std)
+
+robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
+
+
+# value_net = Value(state_dim)
 discrim_net = Discriminator(state_dim + action_dim)
 discrim_criterion = nn.BCELoss()
 to_device(device, policy_net, value_net, discrim_net, discrim_criterion)
@@ -89,8 +166,14 @@ optim_epochs = 10
 optim_batch_size = 64
 
 # load trajectory
-expert_traj, running_state = pickle.load(open(args.expert_traj_path, "rb"))
-running_state.fix = True
+# expert_traj, running_state = pickle.load(open("/home/rhys/CrowdNavigation/PyTorch-RL/expert_traj (1).p", "rb"))
+# running_state.fix = True
+# expert_traj, running_state = pickle.load(open("/home/rhys/CrowdNavigation/PyTorch-RL/assets/expert_traj/Hopper-v2_expert_traj.p", "rb"))
+expert_traj = pickle.load(open("expert_traj.p", "rb"))
+
+# print(expert_traj.shape)
+# print(expert_traj[0])
+# expert_traj = np.ndarray(expert_traj)
 
 
 def expert_reward(state, action):
@@ -101,10 +184,14 @@ def expert_reward(state, action):
 
 """create agent"""
 agent = Agent(env, policy_net, device, custom_reward=expert_reward,
-              running_state=running_state, render=args.render, num_threads=args.num_threads)
+              running_state=running_state, num_threads=args.num_threads)
 
 
 def update_params(batch, i_iter):
+    # states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
+    # actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
+    # rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
+    # masks = torch.from_numpy(np.stack(batch.mask)).to(dtype).to(device)
     states = torch.from_numpy(np.stack(batch.state)).to(dtype).to(device)
     actions = torch.from_numpy(np.stack(batch.action)).to(dtype).to(device)
     rewards = torch.from_numpy(np.stack(batch.reward)).to(dtype).to(device)
@@ -118,12 +205,21 @@ def update_params(batch, i_iter):
 
     """update discriminator"""
     for _ in range(1):
+
+        # expert_state_actions = torch.from_numpy(expert_traj).to(device)
         expert_state_actions = torch.from_numpy(expert_traj).to(dtype).to(device)
+        # test = torch.cat([states, actions], 1)
+        # print(test)
+        # print(test.shape)
+        # print(expert_state_actions.shape)
+
+        # input()
+        # expert_state_actions = torch.from_numpy(expert_traj).to(dtype).to(device)
         g_o = discrim_net(torch.cat([states, actions], 1))
         e_o = discrim_net(expert_state_actions)
         optimizer_discrim.zero_grad()
         discrim_loss = discrim_criterion(g_o, ones((states.shape[0], 1), device=device)) + \
-            discrim_criterion(e_o, zeros((expert_traj.shape[0], 1), device=device))
+            discrim_criterion(e_o, zeros((expert_state_actions.shape[0], 1), device=device))
         discrim_loss.backward()
         optimizer_discrim.step()
 
@@ -150,16 +246,28 @@ def main_loop():
     for i_iter in range(args.max_iter_num):
         """generate multiple trajectories that reach the minimum batch_size"""
         discrim_net.to(torch.device('cpu'))
-        batch, log = agent.collect_samples(args.min_batch_size)
+        batch, log = agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing)
         discrim_net.to(device)
-
+        # print("collected minimum batch")
         t0 = time.time()
         update_params(batch, i_iter)
+        # print("updated params")
         t1 = time.time()
+        """evaluate with determinstic action (remove noise for exploration)"""
+        discrim_net.to(torch.device('cpu'))
+        # print("moved to cpu")
+        _, log_eval = agent.collect_samples(args.eval_batch_size, multiprocessing=args.multiprocessing, mean_action=True) #mean_action=True
+        # print("samples done")
+        discrim_net.to(device)
+        # print("back to gpu")
+        t2 = time.time()
 
-        if i_iter % args.log_interval == 0:
-            print('{}\tT_sample {:.4f}\tT_update {:.4f}\texpert_R_avg {:.2f}\tR_avg {:.2f}'.format(
-                i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward']))
+        if True: #i_iter % args.log_interval == 0:
+            print('{}\tT_sample {:.4f}\tT_update {:.4f}\ttrain_discrim_R_avg {:.2f}\ttrain_R_avg {:.2f}\teval_discrim_R_avg {:.2f}\teval_R_avg {:.2f}'.format(
+                i_iter, log['sample_time'], t1-t0, log['avg_c_reward'], log['avg_reward'], log_eval['avg_c_reward'], log_eval['avg_reward']))
+        
+        log_combine = {**log, **log_eval}
+        if not args.no_wandb: wandb.log(log_combine)
 
         if args.save_model_interval > 0 and (i_iter+1) % args.save_model_interval == 0:
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
