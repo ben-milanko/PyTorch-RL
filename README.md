@@ -1,4 +1,9 @@
 # PyTorch implementation of reinforcement learning algorithms
+## Quickstart
+```
+python gail/gail_gym.py --save-model-interval 100 --model-path assets/learned_models/CrowdSim-v0_gail300.p --expert-traj-path expert_traj --max-iter-num 20000 --save-render
+```
+
 This repository contains:
 1. policy gradient methods (TRPO, PPO, A2C)
 2. [Generative Adversarial Imitation Learning (GAIL)](https://arxiv.org/pdf/1606.03476.pdf)
