@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 def collect_samples(pid, queue, env, policy, custom_reward,
-                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter):
+                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter, env_rand):
     if pid > 0:
         torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
         if hasattr(env, 'np_random'):
@@ -133,7 +133,7 @@ def merge_log(log_list):
 
 class Agent:
 
-    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1, max_reward = 1e6):
+    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1, max_reward = 1e6, env_rand=0):
         self.env = env
         self.policy = policy
         self.device = device
@@ -160,7 +160,7 @@ class Agent:
                 worker.start()
 
             memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                                        render, self.running_state, thread_batch_size, self.max_reward, save_render, iter=iter)
+                                        render, self.running_state, thread_batch_size, self.max_reward, save_render, iter, env_rand)
 
             worker_logs = [None] * len(workers)
             worker_memories = [None] * len(workers)
@@ -187,7 +187,7 @@ class Agent:
 
             if not save_render:
                 memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter)
+                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter, env_rand)
                 to_device(self.device, self.policy)
                 t_end = time.time()
                 batch = memory.sample()
@@ -198,6 +198,6 @@ class Agent:
                 log['action_max'] = np.max(np.vstack(batch.action), axis=0)
             else:
                 collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter)
+                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter, env_rand)
 
         return batch, log

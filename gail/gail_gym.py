@@ -77,6 +77,8 @@ parser.add_argument('--no-wandb', action='store_true', default=False,
 #                     help='pretrains the policy from imitation learning on orca')
 parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
+parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
+                    help='additional environmental randomness to start and end positions')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
@@ -163,7 +165,7 @@ def expert_reward(state, action):
 
 """create agent"""
 agent = Agent(env, policy_net, device, custom_reward=expert_reward,
-              running_state=running_state, num_threads=args.num_threads, max_reward=args.max_reward)
+              running_state=running_state, num_threads=args.num_threads, max_reward=args.max_reward, env_rand=args.env_rand)
 
 
 def update_params(batch, i_iter):

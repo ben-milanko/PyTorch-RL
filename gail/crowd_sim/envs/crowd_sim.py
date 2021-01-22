@@ -180,7 +180,7 @@ class CrowdSim(gym.Env):
 
         return human
 
-    def reset(self, phase='test', test_case=None):
+    def reset(self, phase='test', test_case=None, rand_pos=0):
         """
         Set px, py, gx, gy, vx, vy, theta for robot and humans
         :return:
@@ -196,8 +196,19 @@ class CrowdSim(gym.Env):
 
         base_seed = {'train': self.case_capacity['val'] + self.case_capacity['test'],
                      'val': 0, 'test': self.case_capacity['val']}
+        
+        rand_start_x = 0
+        rand_start_y = 0
+        rand_goal_x = 0
+        rand_goal_y = 0
 
-        self.robot.set(0, -self.circle_radius, 0, self.circle_radius, 0, 0, np.pi / 2)
+        if rand_pos > 0:
+            rand_start_x = random.uniform(-rand_pos, rand_pos)
+            rand_start_y = random.uniform(-rand_pos, rand_pos)
+            rand_goal_x = random.uniform(-rand_pos, rand_pos)
+            rand_goal_y = random.uniform(-rand_pos, rand_pos)
+
+        self.robot.set(rand_start_x, -self.circle_radius+rand_start_y, rand_goal_x, self.circle_radius+rand_goal_y, 0, 0, np.pi / 2)
         if self.case_counter[phase] >= 0:
             np.random.seed(base_seed[phase] + self.case_counter[phase])
             random.seed(base_seed[phase] + self.case_counter[phase])
