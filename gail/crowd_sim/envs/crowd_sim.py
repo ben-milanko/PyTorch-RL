@@ -5,6 +5,8 @@ import math
 import gym
 from gym import error, spaces, utils
 
+from datetime import datetime
+
 import matplotlib.lines as mlines
 from matplotlib import patches
 import numpy as np
@@ -180,7 +182,7 @@ class CrowdSim(gym.Env):
 
         return human
 
-    def reset(self, phase='test', test_case=None, rand_pos=0):
+    def reset(self, phase='test', test_case=None, rand_pos=2.0):
         """
         Set px, py, gx, gy, vx, vy, theta for robot and humans
         :return:
@@ -202,11 +204,15 @@ class CrowdSim(gym.Env):
         rand_goal_x = 0
         rand_goal_y = 0
 
+        random.seed(datetime.now())
+        
         if rand_pos > 0:
             rand_start_x = random.uniform(-rand_pos, rand_pos)
             rand_start_y = random.uniform(-rand_pos, rand_pos)
             rand_goal_x = random.uniform(-rand_pos, rand_pos)
             rand_goal_y = random.uniform(-rand_pos, rand_pos)
+        
+        # print(rand_start_x, rand_start_y, rand_goal_x, rand_goal_y)
 
         self.robot.set(rand_start_x, -self.circle_radius+rand_start_y, rand_goal_x, self.circle_radius+rand_goal_y, 0, 0, np.pi / 2)
         if self.case_counter[phase] >= 0:
