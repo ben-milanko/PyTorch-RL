@@ -45,11 +45,16 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                     action = policy.select_action(state_var)[0].numpy()
             action = int(action) if policy.is_disc_action else action.astype(np.float64)
             
-            action_magnitude = np.sqrt(action[0] ** 2 + action[0] ** 2)
+            # action_magnitude = np.linalg.norm(action)
+            # action_magnitude = np.sqrt(np.square(action[0]) + np.square(action[1]))
             # Clamping the action
-            if action_magnitude > 1:
-                action[0] = action[0]/action_magnitude
-                action[1] = action[1]/action_magnitude
+            # if action_magnitude > 1:
+            #     action = action/action_magnitude
+
+                # # print(action)
+                # action[0] = action[0]/action_magnitude
+                # action[1] = action[1]/action_magnitude
+
 
             next_state, reward, done, _ = env.step(action)
             reward_episode += reward

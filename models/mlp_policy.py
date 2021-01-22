@@ -31,6 +31,9 @@ class Policy(nn.Module):
             x = self.activation(affine(x))
 
         action_mean = self.action_mean(x)
+
+        action_mean = self.activation(action_mean)# * action_max # normalises the action between 0 and 1
+
         action_log_std = self.action_log_std.expand_as(action_mean)
         action_std = torch.exp(action_log_std)
 
