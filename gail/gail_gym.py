@@ -7,6 +7,7 @@ import pickle
 import time
 import importlib
 import wandb
+import socket
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -32,11 +33,11 @@ from crowd_sim.envs.crowd_sim import CrowdSim
 parser = argparse.ArgumentParser(description='PyTorch GAIL example')
 parser.add_argument('--env-name', default="CrowdSim-v0", metavar='G',
                     help='name of the environment to run')
-parser.add_argument('--expert-traj-path', metavar='G',
+parser.add_argument('--expert-traj-path', default="starting_assets/rgl_expert_traj.p", metavar='G',
                     help='path of the expert trajectories')
 parser.add_argument('--render', action='store_true', default=False,
                     help='render the environment')
-parser.add_argument('--save-render', action='store_true', default=False,
+parser.add_argument('--save-render', action='store_false', default=True,
                     help='Save and log the runs as gifs')
 parser.add_argument('--log-std', type=float, default=-0.0, metavar='G',
                     help='log std for the policy (default: -0.0)')
@@ -60,21 +61,19 @@ parser.add_argument('--min-batch-size', type=int, default=2048, metavar='N',
                     help='minimal batch size per PPO update (default: 2048)')
 parser.add_argument('--eval-batch-size', type=int, default=2048, metavar='N',
                     help='minimal batch size for evaluation (default: 2048)')
-parser.add_argument('--max-iter-num', type=int, default=500, metavar='N',
-                    help='maximal number of main iterations (default: 500)')
+parser.add_argument('--max-iter-num', type=int, default=20000, metavar='N',
+                    help='maximal number of main iterations (default: 20000)')
 parser.add_argument('--log-interval', type=int, default=1, metavar='N',
-                    help='interval between training status logs (default: 10)')
-parser.add_argument('--save-model-interval', type=int, default=0, metavar='N',
-                    help="interval between saving model (default: 0, means don't save)")
+                    help='interval between training status logs (default: 1)')
+parser.add_argument('--save-model-interval', type=int, default=100, metavar='N',
+                    help="interval between saving model (default: 100, 0 means don't save)")
 parser.add_argument('--multiprocessing', action='store_true', default=False,
                     help="Sets multiprocessing to true")
 parser.add_argument('--gpu-index', type=int, default=0, metavar='N')
-parser.add_argument('--model-path', metavar='G',
+parser.add_argument('--model-path', default="starting_assets/gail_model.p", metavar='G',
                     help='path of pre-trained model')
 parser.add_argument('--no-wandb', action='store_true', default=False,
                     help='log run on weights & biases')
-# parser.add_argument('--pre-train', action='store_true', default=False,
-#                     help='pretrains the policy from imitation learning on orca')
 parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
 parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
@@ -82,8 +81,21 @@ parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
+starting_model = args.model_path.split('/')[-1].split('.')[0]
 
-if not args.no_wandb: wandb.init(project='crowd_rl', name=f'gail_steps_{args.max_iter_num}_{expert_name}_{args.wandb_description}')
+if not args.no_wandb:
+    wandb.init(project='crowd_rl', name=f'GAIL__{args.wandb_description}',
+        tags=[
+            f'steps:{args.max_iter_num}',
+            f'expert:{expert_name}',
+            f'movement:unicycle',
+            f'reward:mixed',
+            f'action_clamp:tanh',
+            f'environment_randomness:{args.env_rand}',
+            f'starting_model:{starting_model}',
+            f'system:{socket.gethostname()}'
+        ]
+    )
 
 
 dtype = torch.float64
