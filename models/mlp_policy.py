@@ -37,12 +37,17 @@ class Policy(nn.Module):
         action_log_std = self.action_log_std.expand_as(action_mean)
         action_std = torch.exp(action_log_std)
 
+        # print(self.action_log_std)
+
         return action_mean, action_log_std, action_std
 
     def select_action(self, x):
         action_mean, _, action_std = self.forward(x)
+        # print(action_mean)
         action = torch.normal(action_mean, action_std)
-        return action
+        #if torch.norm(action) > torch.tensor(2): print(f'{action}, {torch.norm(action)}')
+
+        return self.activation(action)
 
     def get_kl(self, x):
         mean1, log_std1, std1 = self.forward(x)

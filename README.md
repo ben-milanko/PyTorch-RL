@@ -1,7 +1,7 @@
 # PyTorch implementation of reinforcement learning algorithms
 ## Quickstart
 ```
-python gail/gail_gym.py --save-model-interval 100 --model-path assets/learned_models/CrowdSim-v0_gail300.p --expert-traj-path expert_traj --max-iter-num 20000 --save-render
+python gail/gail_gym.py --save-model-interval 100 --model-path assets/learned_models/CrowdSim-v0_gail300.p --expert-traj-path expert_traj --max-iter-num 20000 --save-render --wandb-description mixed_reward_action_norm_rand_env
 ```
 
 This repository contains:
