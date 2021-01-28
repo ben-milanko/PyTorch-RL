@@ -15,7 +15,7 @@ class Robot(Agent):
         r = self.get_full_state()
 
         pos = np.array([r.px, r.py])
-        target = np.array([target.px, target.py])
+        target = np.array([target[0], target[1]])
 
         dist = np.linalg.norm(target - pos)
 
@@ -39,6 +39,10 @@ class Robot(Agent):
         r = self.get_full_state()
         obs = []
         if self.relative:
+            goal_rel = self.engagement2([r.gx,r.gy])
+            r.gx = goal_rel[0]
+            r.gy = goal_rel[1]
+
             for o in ob:
                 rel = self.engagement2(o)
                 obs.append(ObservableState(rel[0], rel[1], o.vx, o.vy, o.radius))

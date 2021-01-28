@@ -86,7 +86,7 @@ expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 starting_model = args.model_path.split('/')[-1].split('.')[0]
 
 if not args.no_wandb:
-    wandb.init(project='crowd_rl', name=f'GAIL__{args.wandb_description}',
+    wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',
         tags=[
             f'steps:{args.max_iter_num}',
             f'expert:{expert_name}',
