@@ -124,7 +124,7 @@ class Agent(object):
             px = self.px + action[0] * delta_t
             py = self.py + action[1] * delta_t
         else:
-            theta = self.theta*np.pi/6 + action[1]
+            theta = self.theta + action[1]*np.pi/6 
             px = self.px + np.cos(theta) * action[0] * delta_t
             py = self.py + np.sin(theta) * action[0] * delta_t
 
