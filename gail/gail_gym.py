@@ -92,7 +92,8 @@ if not args.no_wandb:
             f'expert:{expert_name}',
             f'movement:unicycle',
             f'reward:mixed',
-            f'relative:{args.relative}'
+            f'relative:{args.relative}',
+            f'rotation_clamp:np.pi/6',
             f'action_clamp:tanh',
             f'environment_randomness:{args.env_rand}',
             f'starting_model:{starting_model}',
