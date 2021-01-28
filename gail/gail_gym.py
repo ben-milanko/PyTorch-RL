@@ -21,13 +21,10 @@ from core.ppo import ppo_step
 from core.common import estimate_advantages
 from core.agent import Agent
 
-from crowd_sim.envs.utils.agent import BasicRobot
-# from crowd_sim.envs.policy.policy_factory import policy_factory
-from crowd_sim.configs.icra_benchmark import gail
-
-from crowd_sim.envs.utils.robot import Robot
-
-from crowd_sim.envs.crowd_sim import CrowdSim
+from gail.crowd_sim.envs.utils.agent import BasicRobot
+from gail.crowd_sim.configs.icra_benchmark import gail
+from gail.crowd_sim.envs.utils.robot import Robot
+from gail.crowd_sim.envs.crowd_sim import CrowdSim
 
 
 parser = argparse.ArgumentParser(description='PyTorch GAIL example')
@@ -74,25 +71,28 @@ parser.add_argument('--model-path', default="starting_assets/gail_model.p", meta
                     help='path of pre-trained model')
 parser.add_argument('--no-wandb', action='store_true', default=False,
                     help='log run on weights & biases')
+parser.add_argument('--holonomic', action='store_true', default=False,
+                    help='Run holonomic movement (default: unicyle)')
 parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
 parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
                     help='additional environmental randomness to start and end positions')
-parser.add_argument('--robot-rot', type=float, default=np.pi/20, metavar='N',
-                    help='robot rotation speed factor (default: np.pi/20)')
+parser.add_argument('--robot-rot', type=float, default=np.pi/10, metavar='N',
+                    help='robot rotation speed factor (default: np.pi/10)')
 parser.add_argument('--relative', default='xy',
                     help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 starting_model = args.model_path.split('/')[-1].split('.')[0]
+movement = 'holonomic' if args.holonomic else 'unicycle'
 
 if not args.no_wandb:
     wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',
         tags=[
             f'steps:{args.max_iter_num}',
             f'expert:{expert_name}',
-            f'movement:unicycle',
+            f'movement:{movement}',
             f'reward:mixed',
             f'relative:{args.relative}',
             f'rotation_clamp:{args.robot_rot:0.2f}',
@@ -128,7 +128,7 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot)
+    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot, kinematics=movement)
     robot.time_step = env.time_step
     #robot.set_policy(policy)
     robot = BasicRobot()
@@ -164,10 +164,10 @@ robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
 
 discrim_criterion = nn.BCELoss()
 
-# if not args.no_wandb: 
-#     wandb.watch(policy_net)
-#     wandb.watch(value_net)
-#     wandb.watch(discrim_net)
+if not args.no_wandb: 
+    wandb.watch(policy_net)
+    wandb.watch(value_net)
+    wandb.watch(discrim_net)
 
 to_device(device, policy_net, value_net, discrim_net, discrim_criterion)
 

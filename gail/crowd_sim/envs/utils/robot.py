@@ -6,8 +6,8 @@ import numpy as np
 
 
 class Robot(Agent):
-    def __init__(self, config, section, relative=False, xy_relative=True, max_rot=np.pi/10):
-        super().__init__(config, section, max_rot)
+    def __init__(self, config, section, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic'):
+        super().__init__(config, section, max_rot, kinematics=kinematics)
         self.relative = relative
         self.xy_relative = xy_relative
 

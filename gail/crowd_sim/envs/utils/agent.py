@@ -2,13 +2,13 @@ import abc
 import logging
 import numpy as np
 from numpy.linalg import norm
-from crowd_sim.envs.policy.policy_factory import policy_factory
-from crowd_sim.envs.utils.action import ActionXY, ActionRot
-from crowd_sim.envs.utils.state import ObservableState, FullState
+from gail.crowd_sim.envs.policy.policy_factory import policy_factory
+from gail.crowd_sim.envs.utils.action import ActionXY, ActionRot
+from gail.crowd_sim.envs.utils.state import ObservableState, FullState
 
 
 class Agent(object):
-    def __init__(self, config, section, max_rot=1):
+    def __init__(self, config, section, max_rot=1, kinematics='holonomic'):
         """
         Base class for robot and human. Have the physical attributes of an agent.
 
@@ -18,7 +18,8 @@ class Agent(object):
         self.radius = getattr(config, section).radius
         self.policy = policy_factory[getattr(config, section).policy]()
         self.sensor = getattr(config, section).sensor
-        self.kinematics = self.policy.kinematics if self.policy is not None else None
+        # self.kinematics = self.policy.kinematics if self.policy is not None else None
+        self.kinematics = kinematics if self.policy is not None else None
         self.px = None
         self.py = None
         self.gx = None

@@ -1,7 +1,7 @@
 import numpy as np
 import rvo2
-from crowd_sim.envs.policy.policy import Policy
-from crowd_sim.envs.utils.action import ActionXY
+from gail.crowd_sim.envs.policy.policy import Policy
+from gail.crowd_sim.envs.utils.action import ActionXY
 
 
 class ORCA(Policy):
