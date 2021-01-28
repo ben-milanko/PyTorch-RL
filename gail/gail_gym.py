@@ -178,11 +178,7 @@ optim_epochs = 10
 optim_batch_size = 64
 
 # load trajectory
-# expert_traj, running_state = pickle.load(open("/home/rhys/CrowdNavigation/PyTorch-RL/expert_traj (1).p", "rb"))
-# running_state.fix = True
-# expert_traj, running_state = pickle.load(open("/home/rhys/CrowdNavigation/PyTorch-RL/assets/expert_traj/Hopper-v2_expert_traj.p", "rb"))
 expert_traj = pickle.load(open("expert_traj.p", "rb"))
-
 
 def expert_reward(state, action):
     state_action = tensor(np.hstack([state, action]), dtype=dtype)
@@ -263,7 +259,7 @@ def main_loop():
             if args.save_render:
                 print(f'Saving renders to: assets/renders/episode_{i_iter+1}')
                 agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing, save_render=True, iter=i_iter+1)
-                if not args.no_wandb: wandb.log({f'episode_{i_iter+1}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i}.gif', fps=12, format="gif") for i in range(5)]})
+                if not args.no_wandb: wandb.log({f'episode_{i_iter+1}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i:06}.gif', fps=12, format="gif") for i in range(5)]})
             
             print('Saving model to: ' + os.path.join(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p'))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)

@@ -1,6 +1,6 @@
 from gail.crowd_sim.envs.utils.state import ObservableState
-from crowd_sim.envs.utils.agent import Agent
-from crowd_sim.envs.utils.state import JointState
+from gail.crowd_sim.envs.utils.agent import Agent
+from gail.crowd_sim.envs.utils.state import JointState
 import numpy as np
 
 

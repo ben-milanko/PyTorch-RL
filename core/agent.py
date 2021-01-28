@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 def collect_samples(pid, queue, env, policy, custom_reward,
-                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter, env_rand):
+                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter,env_rand):
     if pid > 0:
         torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
         if hasattr(env, 'np_random'):
@@ -25,9 +25,14 @@ def collect_samples(pid, queue, env, policy, custom_reward,
     max_c_reward = -max_reward
     num_episodes = 0
 
+    total_e_reward = 0
+    min_e_reward = max_reward
+    max_e_reward = -max_reward
+
     if save_render: 
         if not os.path.exists(f'assets/renders/episode_{iter}'):
             os.mkdir(f'assets/renders/episode_{iter}')
+
 
     while num_steps < min_batch_size:
 
@@ -35,6 +40,8 @@ def collect_samples(pid, queue, env, policy, custom_reward,
         if running_state is not None:
             state = running_state(state)
         reward_episode = 0
+        discrim_episode = []
+        env_episode = []
 
         for t in range(10000):
             state_var = tensor(state).unsqueeze(0)
@@ -44,40 +51,40 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                 else:
                     action = policy.select_action(state_var)[0].numpy()
             action = int(action) if policy.is_disc_action else action.astype(np.float64)
-            
-            # action_magnitude = np.linalg.norm(action)
-            # action_magnitude = np.sqrt(np.square(action[0]) + np.square(action[1]))
-            # Clamping the action
-            # if action_magnitude > 1:
-            #     action = action/action_magnitude
-
-                # # print(action)
-                # action[0] = action[0]/action_magnitude
-                # action[1] = action[1]/action_magnitude
-
 
             next_state, reward, done, _ = env.step(action)
             reward_episode += reward
+
+            total_e_reward += custom_reward(state, action)
+            min_e_reward = min(min_e_reward, reward)
+            max_e_reward = max(max_e_reward, reward)
 
             if not save_render:
                 if running_state is not None:
                     next_state = running_state(next_state)
 
                 if custom_reward is not None:
-                    #reward = custom_reward(state, action)
-                    reward = custom_reward(state, action) + reward
+                    # reward = custom_reward(state, action)
+                    # print(f'Discriminator: {custom_reward(state, action)} Environment: {reward}')
+                    discrim_episode += custom_reward(state, action)
+                    env_episode += reward
 
-                    total_c_reward += reward
+                    reward = custom_reward(state, action) + reward
+                    
+                    total_c_reward += custom_reward(state, action)
                     min_c_reward = min(min_c_reward, reward)
                     max_c_reward = max(max_c_reward, reward)
 
                 mask = 0 if done else 1
+        
 
                 memory.push(state, action, mask, next_state, reward)
+            else:
+                discrim_episode.append(custom_reward(state, action))
 
             if done:
                 if save_render:
-                    output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes}.gif', 'wb')
+                    output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes:06}.gif', 'wb')
                     env.render(output_file=output_file)
                 if render:
                     env.render()
@@ -86,7 +93,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             state = next_state
             if save_render and num_episodes == 5:
                 return
-
+            
         # log stats
         num_steps += (t + 1)
         num_episodes += 1
@@ -102,6 +109,11 @@ def collect_samples(pid, queue, env, policy, custom_reward,
     log['avg_reward'] = total_reward / num_episodes
     log['max_reward'] = max_reward
     log['min_reward'] = min_reward
+    log['total_e_reward'] = total_e_reward
+    log['avg_e_reward'] = total_e_reward / num_steps
+    log['max_e_reward'] = max_e_reward
+    log['min_e_reward'] = min_e_reward
+
     if custom_reward is not None:
         log['total_c_reward'] = total_c_reward
         log['avg_c_reward'] = total_c_reward / num_steps
