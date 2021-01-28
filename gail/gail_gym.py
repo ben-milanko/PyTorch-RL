@@ -78,6 +78,8 @@ parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
 parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
                     help='additional environmental randomness to start and end positions')
+parser.add_argument('--relative', default='xy',
+                    help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
@@ -90,6 +92,7 @@ if not args.no_wandb:
             f'expert:{expert_name}',
             f'movement:unicycle',
             f'reward:mixed',
+            f'relative:{args.relative}'
             f'action_clamp:tanh',
             f'environment_randomness:{args.env_rand}',
             f'starting_model:{starting_model}',
@@ -111,7 +114,18 @@ if args.env_name == 'CrowdSim-v0':
     env = CrowdSim()
     env_config = gail.EnvConfig(True)
     env.configure(env_config)
-    robot = Robot(env_config, 'robot')
+    
+    relative_xy = False
+    relative = False
+
+    if args.relative == 'xy':
+        relative = True
+        relative_xy = True
+    elif args.relative == 'polar':
+        relative = True
+        relative_xy = False
+
+    robot = Robot(env_config, 'robot', relative, relative_xy)
     robot.time_step = env.time_step
     #robot.set_policy(policy)
     robot = BasicRobot()
