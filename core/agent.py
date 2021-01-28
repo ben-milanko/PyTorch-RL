@@ -40,8 +40,6 @@ def collect_samples(pid, queue, env, policy, custom_reward,
         if running_state is not None:
             state = running_state(state)
         reward_episode = 0
-        discrim_episode = []
-        env_episode = []
 
         for t in range(10000):
             state_var = tensor(state).unsqueeze(0)
@@ -55,7 +53,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             next_state, reward, done, _ = env.step(action)
             reward_episode += reward
 
-            total_e_reward += custom_reward(state, action)
+            total_e_reward += reward
             min_e_reward = min(min_e_reward, reward)
             max_e_reward = max(max_e_reward, reward)
 
@@ -65,7 +63,6 @@ def collect_samples(pid, queue, env, policy, custom_reward,
 
                 if custom_reward is not None:
                     discrim_reward = custom_reward(state, action)
-                    env_episode += reward
 
                     reward = discrim_reward + reward
                     
