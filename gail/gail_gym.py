@@ -78,8 +78,8 @@ parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
 parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
                     help='additional environmental randomness to start and end positions')
-parser.add_argument('--robot-rot', type=float, default=np.pi/10, metavar='N',
-                    help='robot rotation speed factor (default: np.pi/10)')
+parser.add_argument('--robot-rot', type=float, default=np.pi/20, metavar='N',
+                    help='robot rotation speed factor (default: np.pi/20)')
 parser.add_argument('--relative', default='xy',
                     help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
 args = parser.parse_args()
