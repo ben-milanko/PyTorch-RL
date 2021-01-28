@@ -64,14 +64,12 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                     next_state = running_state(next_state)
 
                 if custom_reward is not None:
-                    # reward = custom_reward(state, action)
-                    # print(f'Discriminator: {custom_reward(state, action)} Environment: {reward}')
-                    discrim_episode += custom_reward(state, action)
+                    discrim_reward = custom_reward(state, action)
                     env_episode += reward
 
-                    reward = custom_reward(state, action) + reward
+                    reward = discrim_reward + reward
                     
-                    total_c_reward += custom_reward(state, action)
+                    total_c_reward += discrim_reward
                     min_c_reward = min(min_c_reward, reward)
                     max_c_reward = max(max_c_reward, reward)
 
@@ -79,8 +77,6 @@ def collect_samples(pid, queue, env, policy, custom_reward,
         
 
                 memory.push(state, action, mask, next_state, reward)
-            else:
-                discrim_episode.append(custom_reward(state, action))
 
             if done:
                 if save_render:
