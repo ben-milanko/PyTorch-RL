@@ -85,14 +85,14 @@ args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 starting_model = args.model_path.split('/')[-1].split('.')[0]
-movement = 'holonomic' if args.holonomic else 'unicycle'
+kinematics = 'holonomic' if args.holonomic else 'unicycle'
 
 if not args.no_wandb:
     wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',
         tags=[
             f'steps:{args.max_iter_num}',
             f'expert:{expert_name}',
-            f'movement:{movement}',
+            f'kinematics:{kinematics}',
             f'reward:mixed',
             f'relative:{args.relative}',
             f'rotation_clamp:{args.robot_rot:0.2f}',
@@ -128,7 +128,7 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot, kinematics=movement)
+    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot, kinematics=kinematics)
     robot.time_step = env.time_step
     #robot.set_policy(policy)
     robot = BasicRobot()
@@ -164,10 +164,10 @@ robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
 
 discrim_criterion = nn.BCELoss()
 
-if not args.no_wandb: 
-    wandb.watch(policy_net)
-    wandb.watch(value_net)
-    wandb.watch(discrim_net)
+# if not args.no_wandb: 
+#     wandb.watch(policy_net)
+#     wandb.watch(value_net)
+#     wandb.watch(discrim_net)
 
 to_device(device, policy_net, value_net, discrim_net, discrim_criterion)
 
