@@ -8,7 +8,7 @@ from crowd_sim.envs.utils.state import ObservableState, FullState
 
 
 class Agent(object):
-    def __init__(self, config, section):
+    def __init__(self, config, section, max_rot=1):
         """
         Base class for robot and human. Have the physical attributes of an agent.
 
@@ -27,6 +27,7 @@ class Agent(object):
         self.vy = None
         self.theta = None
         self.time_step = None
+        self.max_rot = max_rot
 
     def print_info(self):
         logging.info('Agent is {} and has {} kinematic constraint'.format(
@@ -124,7 +125,7 @@ class Agent(object):
             px = self.px + action[0] * delta_t
             py = self.py + action[1] * delta_t
         else:
-            theta = self.theta + action[1]*np.pi/10
+            theta = self.theta + action[1]*self.max_rot
             px = self.px + np.cos(theta) * action[0] * delta_t
             py = self.py + np.sin(theta) * action[0] * delta_t
 
@@ -142,7 +143,7 @@ class Agent(object):
                 self.vx = action[0]
                 self.vy = action[1]
             else:
-                self.theta = (self.theta + action[1]) % (2 * np.pi)
+                self.theta = (self.theta + action[1]*self.max_rot) % (2 * np.pi)
                 self.vx = action[0] * np.cos(self.theta)
                 self.vy = action[0] * np.sin(self.theta)
         else:
@@ -150,7 +151,7 @@ class Agent(object):
                 self.vx = action.vx
                 self.vy = action.vy
             else:
-                self.theta = (self.theta + action.r) % (2 * np.pi)
+                self.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
                 self.vx = action.v * np.cos(self.theta)
                 self.vy = action.v * np.sin(self.theta)
 

@@ -77,7 +77,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
 
             if done:
                 if save_render:
-                    output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes:06}.gif', 'wb')
+                    output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes}.gif', 'wb')
                     env.render(output_file=output_file)
                 if render:
                     env.render()

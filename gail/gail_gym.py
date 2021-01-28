@@ -78,6 +78,8 @@ parser.add_argument('--wandb-description', default='', metavar='G',
                     help='description to append to wandb run title')
 parser.add_argument('--env-rand', type=float, default=2.0, metavar='N',
                     help='additional environmental randomness to start and end positions')
+parser.add_argument('--robot-rot', type=float, default=np.pi/10, metavar='N',
+                    help='robot rotation speed factor (default: np.pi/10)')
 parser.add_argument('--relative', default='xy',
                     help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
 args = parser.parse_args()
@@ -93,7 +95,7 @@ if not args.no_wandb:
             f'movement:unicycle',
             f'reward:mixed',
             f'relative:{args.relative}',
-            f'rotation_clamp:np.pi/10',
+            f'rotation_clamp:{args.robot_rot}',
             f'action_clamp:tanh',
             f'environment_randomness:{args.env_rand}',
             f'starting_model:{starting_model}',
@@ -126,7 +128,7 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = Robot(env_config, 'robot', relative, relative_xy)
+    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot)
     robot.time_step = env.time_step
     #robot.set_policy(policy)
     robot = BasicRobot()
@@ -259,7 +261,7 @@ def main_loop():
             if args.save_render:
                 print(f'Saving renders to: assets/renders/episode_{i_iter+1}')
                 agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing, save_render=True, iter=i_iter+1)
-                if not args.no_wandb: wandb.log({f'episode_{i_iter+1}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i:06}.gif', fps=12, format="gif") for i in range(5)]})
+                if not args.no_wandb: wandb.log({f'episode_{(i_iter+1):0len(str(args.max_iter_num))}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i}.gif', fps=12, format="gif") for i in range(5)]})
             
             print('Saving model to: ' + os.path.join(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p'))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
