@@ -93,7 +93,7 @@ if not args.no_wandb:
             f'movement:unicycle',
             f'reward:mixed',
             f'relative:{args.relative}',
-            f'rotation_clamp:np.pi/6',
+            f'rotation_clamp:np.pi/10',
             f'action_clamp:tanh',
             f'environment_randomness:{args.env_rand}',
             f'starting_model:{starting_model}',
