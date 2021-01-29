@@ -128,7 +128,7 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = BasicRobot(relative=relative, relative_xy=relative_xy, max_rot=args.robot_rot, kinematics=kinematics, reverse=args.reverse)
+    robot = BasicRobot(relative=relative, xy_relative=relative_xy, max_rot=args.robot_rot, kinematics=kinematics, reverse=args.reverse)
     env.set_robot(robot)
 
 else:
