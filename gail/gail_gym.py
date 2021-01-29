@@ -23,7 +23,6 @@ from core.agent import Agent
 
 from gail.crowd_sim.envs.utils.agent import BasicRobot
 from gail.crowd_sim.configs.icra_benchmark import gail
-from gail.crowd_sim.envs.utils.robot import Robot
 from gail.crowd_sim.envs.crowd_sim import CrowdSim
 
 
@@ -81,6 +80,8 @@ parser.add_argument('--robot-rot', type=float, default=np.pi/10, metavar='N',
                     help='robot rotation speed factor (default: np.pi/10)')
 parser.add_argument('--relative', default='xy',
                     help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
+parser.add_argument('--reverse', action='store_true', default=False,
+                    help='Allow robot to reverse in unicycle mode (default: False)')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
@@ -93,6 +94,7 @@ tags = [
         f'reward:mixed',
         f'relative:{args.relative}',
         f'rotation_clamp:{args.robot_rot:0.2f}',
+        f'reverse:{args.reverse}',
         f'action_clamp:tanh',
         f'goal_randomisation:{args.env_rand}',
         f'starting_model:{starting_model}',
@@ -126,9 +128,9 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = BasicRobot(relative, relative_xy, args.robot_rot, kinematics=kinematics)
-
+    robot = BasicRobot(relative=relative, relative_xy=relative_xy, max_rot=args.robot_rot, kinematics=kinematics, reverse=args.reverse)
     env.set_robot(robot)
+
 else:
     gym.make(args.env_name)
 
@@ -136,7 +138,6 @@ state_dim = env.observation_space.shape[0]
 is_disc_action = len(env.action_space.shape) == 0
 action_dim = 1 if is_disc_action else env.action_space.shape[0]
 running_state = None #ZFilter((state_dim,), clip=5)
-# running_reward = ZFilter((1,), demean=False, clip=10)
 
 """seeding"""
 np.random.seed(args.seed)

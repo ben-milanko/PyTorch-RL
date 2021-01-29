@@ -164,7 +164,7 @@ class BasicPolicy():
         self.multiagent_training = False
 
 class BasicRobot(Agent):
-    def __init__(self, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic'):
+    def __init__(self, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic', reverse=True):
         self.visible = True
         self.v_pref = 1
         self.radius = 0.3
@@ -185,6 +185,7 @@ class BasicRobot(Agent):
         self.relative = relative
         self.xy_relative = xy_relative
         self.max_rot = max_rot
+        self.reverse=reverse
     
     def engagement2(self, target):
         r = self.get_full_state()
@@ -249,9 +250,13 @@ class BasicRobot(Agent):
             else:
                 #The rotation of the robot is reduced by self.max_rot by default np.pi/10
                 self.theta = (self.theta + action[1]*self.max_rot) % (2 * np.pi)
+                if self.reverse:
+                    action = action[0]
+                else:
+                    action = (action[0]+1)/2
 
-                self.vx = action[0] * np.cos(self.theta)
-                self.vy = action[0] * np.sin(self.theta)
+                self.vx = action * np.cos(self.theta)
+                self.vy = action * np.sin(self.theta)
         else:
             if self.kinematics == 'holonomic':
                 self.vx = action.vx
@@ -259,6 +264,11 @@ class BasicRobot(Agent):
             else:
                 #The rotation of the robot is reduced by self.max_rot by default np.pi/10
                 self.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
+
+                if self.reverse:
+                    action = action.v
+                else:
+                    action = (action.v+1)/2
 
                 self.vx = action.v * np.cos(self.theta)
                 self.vy = action.v * np.sin(self.theta)
