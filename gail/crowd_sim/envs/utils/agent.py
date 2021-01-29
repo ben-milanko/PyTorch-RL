@@ -4,7 +4,7 @@ import numpy as np
 from numpy.linalg import norm
 from gail.crowd_sim.envs.policy.policy_factory import policy_factory
 from gail.crowd_sim.envs.utils.action import ActionXY, ActionRot
-from gail.crowd_sim.envs.utils.state import ObservableState, FullState
+from gail.crowd_sim.envs.utils.state import JointState, ObservableState, FullState
 
 
 class Agent(object):
@@ -39,7 +39,7 @@ class Agent(object):
             raise ValueError('Time step is None')
         policy.set_time_step(self.time_step)
         self.policy = policy
-        self.kinematics = policy.kinematics
+        self.kinematics = self.kinematics #policy.kinematics
 
     def sample_random_attributes(self):
         """
@@ -164,14 +164,11 @@ class BasicPolicy():
         self.multiagent_training = False
 
 class BasicRobot(Agent):
-    def __init__(self):
-        
-        self.visible = True #getattr(config, section).visible
-        self.v_pref = 1 #getattr(config, section).v_pref
-        self.radius = 0.3 #getattr(config, section).radius
-        self.policy = BasicPolicy() #policy_factory[getattr(config, section).policy]()
-        self.sensor = "coordinates" #getattr(config, section).sensor
-        self.kinematics = "holonomic" #self.policy.kinematics if self.policy is not None else None
+    def __init__(self, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic'):
+        self.visible = True
+        self.v_pref = 1
+        self.radius = 0.3
+        self.sensor = "coordinates"
         self.px = None
         self.py = None
         self.gx = None
@@ -181,29 +178,78 @@ class BasicRobot(Agent):
         self.theta = None
         self.time_step = None
 
+        #Policy is required to pass asserts later, it isn't used at all due to the custom act
+        self.policy = BasicPolicy()
+
+        self.kinematics = kinematics
+        self.relative = relative
+        self.xy_relative = xy_relative
+        self.max_rot = max_rot
+    
+    def engagement2(self, target):
+        r = self.get_full_state()
+
+        pos = np.array([r.px, r.py])
+        target = np.array([target[0], target[1]])
+
+        dist = np.linalg.norm(target - pos)
+
+        yaw = r.theta % (2 * np.pi)
+        R = np.array([[np.cos(yaw), np.sin(yaw)],
+                        [-np.sin(yaw), np.cos(yaw)]])
+
+        T_p = target.pos() - self.pos()
+        T_p = R.dot(T_p)
+        alpha = np.arctan2(T_p[1], T_p[0])
+        
+        if self.xy_relative:
+            return dist*np.cos(alpha), dist*np.sin(alpha)
+        else:
+            return alpha, dist
+
     def set_act(self, action_function):
         self.action_function = action_function
         
     def act(self, ob):
-        return self.action_function(ob)
+      
+        r = self.get_full_state()
+        obs = []
+        if self.relative:
 
+            #In relative mode the robot does not have access to its current global position.
+            r.px = 0
+            r.py = 0
 
+            #Engagement 2 translates the position of a target to the robots coordinate frame in this case its the goal.
+            goal_rel = self.engagement2([r.gx,r.gy])
+            r.gx = goal_rel[0]
+            r.gy = goal_rel[1]
+
+            #Translate each human to the robots coordinate frame.
+            for o in ob:
+                rel = self.engagement2(o)
+                obs.append(ObservableState(rel[0], rel[1], o.vx, o.vy, o.radius))
+
+        #Combine the robot and human observations
+        state = JointState(r, ob)
+        
+        return self.action_function(state)
 
     def step(self, action):
         """
         Perform an action and update the state
         """
         self.check_validity(action)
-        # print("action", action)
         pos = self.compute_position(action, self.time_step)
-        # print("pos", pos)
         self.px, self.py = pos
         if type(action) is np.ndarray:
             if self.kinematics == 'holonomic':
                 self.vx = action[0]
                 self.vy = action[1]
             else:
-                self.theta = (self.theta + action[1]) % (2 * np.pi)
+                #The rotation of the robot is reduced by self.max_rot by default np.pi/10
+                self.theta = (self.theta + action[1]*self.max_rot) % (2 * np.pi)
+
                 self.vx = action[0] * np.cos(self.theta)
                 self.vy = action[0] * np.sin(self.theta)
         else:
@@ -211,6 +257,8 @@ class BasicRobot(Agent):
                 self.vx = action.vx
                 self.vy = action.vy
             else:
-                self.theta = (self.theta + action.r) % (2 * np.pi)
+                #The rotation of the robot is reduced by self.max_rot by default np.pi/10
+                self.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
+
                 self.vx = action.v * np.cos(self.theta)
                 self.vy = action.v * np.sin(self.theta)

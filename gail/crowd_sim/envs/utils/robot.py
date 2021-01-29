@@ -7,6 +7,8 @@ import numpy as np
 
 class Robot(Agent):
     def __init__(self, config, section, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic'):
+        print(kinematics)
+        input()
         super().__init__(config, section, max_rot, kinematics=kinematics)
         self.relative = relative
         self.xy_relative = xy_relative
@@ -48,6 +50,5 @@ class Robot(Agent):
                 obs.append(ObservableState(rel[0], rel[1], o.vx, o.vy, o.radius))
 
         state = JointState(r, ob)
-        relative=False
         action = self.policy.predict(state)
         return action

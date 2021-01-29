@@ -94,8 +94,6 @@ def collect_samples(pid, queue, env, policy, custom_reward,
         min_reward = min(min_reward, reward_episode)
         max_reward = max(max_reward, reward_episode)
     
-
-
     log['num_steps'] = num_steps
     log['num_episodes'] = num_episodes
     log['total_reward'] = total_reward

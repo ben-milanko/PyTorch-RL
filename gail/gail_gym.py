@@ -86,22 +86,20 @@ args = parser.parse_args()
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 starting_model = args.model_path.split('/')[-1].split('.')[0]
 kinematics = 'holonomic' if args.holonomic else 'unicycle'
-
-if not args.no_wandb:
-    wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',
-        tags=[
-            f'steps:{args.max_iter_num}',
-            f'expert:{expert_name}',
-            f'kinematics:{kinematics}',
-            f'reward:mixed',
-            f'relative:{args.relative}',
-            f'rotation_clamp:{args.robot_rot:0.2f}',
-            f'action_clamp:tanh',
-            f'goal_randomisation:{args.env_rand}',
-            f'starting_model:{starting_model}',
-            f'system:{socket.gethostname()}'
-        ]
-    )
+tags = [
+        f'steps:{args.max_iter_num}',
+        f'expert:{expert_name}',
+        f'kinematics:{kinematics}',
+        f'reward:mixed',
+        f'relative:{args.relative}',
+        f'rotation_clamp:{args.robot_rot:0.2f}',
+        f'action_clamp:tanh',
+        f'goal_randomisation:{args.env_rand}',
+        f'starting_model:{starting_model}',
+        f'system:{socket.gethostname()}'
+    ]
+print(f'Tags: {tags}')
+if not args.no_wandb: wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',tags=tags)
 
 
 dtype = torch.float64
@@ -128,10 +126,7 @@ if args.env_name == 'CrowdSim-v0':
         relative = True
         relative_xy = False
 
-    robot = Robot(env_config, 'robot', relative, relative_xy, args.robot_rot, kinematics=kinematics)
-    robot.time_step = env.time_step
-    #robot.set_policy(policy)
-    robot = BasicRobot()
+    robot = BasicRobot(relative, relative_xy, args.robot_rot, kinematics=kinematics)
 
     env.set_robot(robot)
 else:
