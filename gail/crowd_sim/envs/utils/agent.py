@@ -128,13 +128,13 @@ class Agent(object):
             py = self.py + action[1] * delta_t
         else:
             if self.reverse:
-                action = action[0]
+                action_v = action[0]
             else:
-                action = (action[0]+1)/2
+                action_v = (action[0]+1)/2
 
             theta = self.theta + action[1]*self.max_rot
-            px = self.px + np.cos(theta) * action * delta_t
-            py = self.py + np.sin(theta) * action * delta_t
+            px = self.px + np.cos(theta) * action_v * delta_t
+            py = self.py + np.sin(theta) * action_v * delta_t
 
         return px, py
 
@@ -256,13 +256,14 @@ class BasicRobot(Agent):
             else:
                 #The rotation of the robot is reduced by self.max_rot by default np.pi/10
                 self.theta = (self.theta + action[1]*self.max_rot) % (2 * np.pi)
-                if self.reverse:
-                    action = action[0]
-                else:
-                    action = (action[0]+1)/2
 
-                self.vx = action * np.cos(self.theta)
-                self.vy = action * np.sin(self.theta)
+                if self.reverse:
+                    action_v = action[0]
+                else:
+                    action_v = (action[0]+1)/2
+
+                self.vx = action_v * np.cos(self.theta)
+                self.vy = action_v * np.sin(self.theta)
         else:
             if self.kinematics == 'holonomic':
                 self.vx = action.vx
