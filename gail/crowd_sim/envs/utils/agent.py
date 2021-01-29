@@ -122,13 +122,19 @@ class Agent(object):
 
     def compute_position(self, action, delta_t):
         self.check_validity(action)
+            
         if self.kinematics == 'holonomic':
             px = self.px + action[0] * delta_t
             py = self.py + action[1] * delta_t
         else:
+            if self.reverse:
+                action = action[0]
+            else:
+                action = (action[0]+1)/2
+
             theta = self.theta + action[1]*self.max_rot
-            px = self.px + np.cos(theta) * action[0] * delta_t
-            py = self.py + np.sin(theta) * action[0] * delta_t
+            px = self.px + np.cos(theta) * action * delta_t
+            py = self.py + np.sin(theta) * action * delta_t
 
         return px, py
 
