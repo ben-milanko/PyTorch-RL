@@ -106,9 +106,13 @@ if not args.no_wandb: wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_des
 
 dtype = torch.float64
 torch.set_default_dtype(dtype)
-device = torch.device('cuda', index=args.gpu_index) if torch.cuda.is_available() else torch.device('cpu')
-if torch.cuda.is_available():
-    torch.cuda.set_device(args.gpu_index)
+
+if args.gpu_index == -1:
+    device = torch.device('cpu')
+else:
+    device = torch.device('cuda', index=args.gpu_index) if torch.cuda.is_available() else torch.device('cpu')
+    if torch.cuda.is_available():
+        torch.cuda.set_device(args.gpu_index)
 
 """environment"""
 env = None
