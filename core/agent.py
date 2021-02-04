@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 def collect_samples(pid, queue, env, policy, custom_reward,
-                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter,env_rand):
+                    mean_action, render, running_state, min_batch_size, max_reward, save_render, iter,env_rand, value):
     if pid > 0:
         torch.manual_seed(torch.randint(0, 5000, (1,)) * pid)
         if hasattr(env, 'np_random'):
@@ -50,7 +50,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
                     action = policy.select_action(state_var)[0].numpy()
             action = int(action) if policy.is_disc_action else action.astype(np.float64)
 
-            next_state, reward, done, _ = env.step(action)
+            next_state, reward, done, _ = env.step(action, step_heatmap=save_render)
             reward_episode += reward
 
             total_e_reward += reward
@@ -78,7 +78,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
             if done:
                 if save_render:
                     output_file = open(f'assets/renders/episode_{iter}/sample_{num_episodes}.gif', 'wb')
-                    env.render(output_file=output_file)
+                    env.render(output_file=output_file, value_net=value)
                 if render:
                     env.render()
                 break
@@ -136,7 +136,7 @@ def merge_log(log_list):
 
 class Agent:
 
-    def __init__(self, env, policy, device, custom_reward=None, running_state=None, num_threads=1, max_reward = 1e6, env_rand=2.0):
+    def __init__(self, env, policy, device, custom_reward=None, value=None, running_state=None, num_threads=1, max_reward = 1e6, env_rand=2.0):
         self.env = env
         self.policy = policy
         self.device = device
@@ -145,6 +145,7 @@ class Agent:
         self.num_threads = num_threads
         self.max_reward = max_reward
         self.env_rand = env_rand
+        self.value = value
 
     def collect_samples(self, min_batch_size, mean_action=False, render=False, multiprocessing=True, save_render = False, iter=None):
         log = None
@@ -191,7 +192,7 @@ class Agent:
 
             if not save_render:
                 memory, log = collect_samples(0, None, self.env, self.policy, self.custom_reward, mean_action,
-                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter, self.env_rand)
+                            render, self.running_state, min_batch_size, self.max_reward, save_render, iter, self.env_rand, self.value)
                 to_device(self.device, self.policy)
                 t_end = time.time()
                 batch = memory.sample()

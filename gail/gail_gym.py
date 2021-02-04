@@ -149,7 +149,6 @@ torch.manual_seed(args.seed)
 env.seed(args.seed)
 
 """define actor and critic"""
-"""define actor and critic"""
 if args.model_path is None:
     if is_disc_action:
         policy_net = DiscretePolicy(state_dim, env.action_space.n)
@@ -161,6 +160,7 @@ else:
     policy_net, value_net, discrim_net = pickle.load(open(args.model_path, "rb"))
 
 robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
+robot.value = value_net
 
 discrim_criterion = nn.BCELoss()
 

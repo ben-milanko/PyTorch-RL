@@ -170,7 +170,7 @@ class BasicPolicy():
         self.multiagent_training = False
 
 class BasicRobot(Agent):
-    def __init__(self, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic', reverse=True):
+    def __init__(self, relative=False, xy_relative=True, max_rot=np.pi/10, kinematics='holonomic', reverse=True, value=None):
         self.visible = True
         self.v_pref = 1
         self.radius = 0.3
@@ -192,6 +192,9 @@ class BasicRobot(Agent):
         self.xy_relative = xy_relative
         self.max_rot = max_rot
         self.reverse=reverse
+
+        # Required to visualise 
+        self.value = value
     
     def engagement2(self, target):
         r = self.get_full_state()

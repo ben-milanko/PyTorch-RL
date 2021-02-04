@@ -7,6 +7,7 @@ def ppo_step(policy_net, value_net, optimizer_policy, optimizer_value, optim_val
     """update critic"""
     for _ in range(optim_value_iternum):
         values_pred = value_net(states)
+        input()
         value_loss = (values_pred - returns).pow(2).mean()
         # weight decay
         for param in value_net.parameters():
