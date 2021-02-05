@@ -162,16 +162,18 @@ else:
     policy_net, value_net, discrim_net = pickle.load(open(args.model_path, "rb"))
 
 robot.set_act(lambda x : policy_net(tensor(x))[0][0].numpy())
-robot.value = value_net
 
 discrim_criterion = nn.BCELoss()
 
-# if not args.no_wandb: 
-#     wandb.watch(policy_net)
-#     wandb.watch(value_net)
-#     wandb.watch(discrim_net)
+if not args.no_wandb: 
+    wandb.watch(policy_net)
+    wandb.watch(value_net)
+    wandb.watch(discrim_net)
 
 to_device(device, policy_net, value_net, discrim_net, discrim_criterion)
+
+# Put the value net to device before assigning it to robot
+robot.value = value_net
 
 optimizer_policy = torch.optim.Adam(policy_net.parameters(), lr=args.learning_rate)
 optimizer_value = torch.optim.Adam(value_net.parameters(), lr=args.learning_rate)
