@@ -52,7 +52,7 @@ def collect_samples(pid, queue, env, policy, custom_reward,
 
             step_heatmap = False
             if num_episodes == 0:
-                step_heatmap = env.heatmap
+                step_heatmap = env.heatmap and (render or save_render)
             elif render:
                 step_heatmap = ((num_episodes % render == 0) or save_render) and env.heatmap
 

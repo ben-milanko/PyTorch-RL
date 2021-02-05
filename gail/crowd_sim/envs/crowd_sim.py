@@ -445,6 +445,8 @@ class CrowdSim(gym.Env):
                     states = state if states == None else torch.vstack((states, state))
             with torch.no_grad():
                 states.to(self.device)
+                self.robot.value.to(self.device)
+                
                 vals = self.robot.value(states)
                 vals = torch.reshape(vals, (fidelity, fidelity))
                 self.values.append(vals.numpy())
