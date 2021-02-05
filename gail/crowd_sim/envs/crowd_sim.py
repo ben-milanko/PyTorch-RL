@@ -422,21 +422,8 @@ class CrowdSim(gym.Env):
                         action = ActionRot(speed, rotation)
                     
                     human_state, reward, done, _ = self.onestep_lookahead(action)
-                    r = self.robot.get_full_state()
+                    r = self.robot.get_next_full_state(action)
                     
-                    pos = self.robot.compute_position(action, 0.25)
-                    r.px, r.py = pos
-
-                    if self.robot.kinematics == 'holonomic':
-                        r.vx = action.vx
-                        r.vy = action.vy
-                    else:
-                        #The rotation of the robot is reduced by self.max_rot by default np.pi/10
-                        r.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
-
-                        r.vx = action.v * np.cos(self.theta)
-                        r.vy = action.v * np.sin(self.theta)
-                        
                     joint_state = JointState(r, human_state)
                     
                     r_tensor, h_tensor = joint_state.to_tensor()
@@ -446,7 +433,7 @@ class CrowdSim(gym.Env):
             with torch.no_grad():
                 states.to(self.device)
                 self.robot.value.to(self.device)
-                
+
                 vals = self.robot.value(states)
                 vals = torch.reshape(vals, (fidelity, fidelity))
                 self.values.append(vals.numpy())

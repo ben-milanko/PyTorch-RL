@@ -79,6 +79,19 @@ class Agent(object):
             next_vy = action.v * np.sin(self.theta)
         return ObservableState(next_px, next_py, next_vx, next_vy, self.radius)
 
+    def get_next_full_state(self, action):
+        self.check_validity(action)
+        pos = self.compute_position(action, self.time_step)
+        next_px, next_py = pos
+        if self.kinematics == 'holonomic':
+            next_vx = action.vx
+            next_vy = action.vy
+        else:
+            next_theta = (self.theta + action[1]*self.max_rot) % (2 * np.pi)
+            next_vx = action.v * np.cos(self.theta)
+            next_vy = action.v * np.sin(self.theta)
+        return FullState(next_px, next_py, next_vx, next_vy, self.radius, self.gx, self.gy, self.v_pref, next_theta)
+
     def get_full_state(self):
         return FullState(self.px, self.py, self.vx, self.vy, self.radius, self.gx, self.gy, self.v_pref, self.theta)
 
