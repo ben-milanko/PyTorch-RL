@@ -276,9 +276,9 @@ class BasicRobot(Agent):
                 self.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
 
                 if self.reverse:
-                    action = action.v
+                    action_v = action.v
                 else:
-                    action = (action.v+1)/2
+                    action_v = (action.v+1)/2
 
-                self.vx = action.v * np.cos(self.theta)
-                self.vy = action.v * np.sin(self.theta)
+                self.vx = action_v * np.cos(self.theta)
+                self.vy = action_v * np.sin(self.theta)

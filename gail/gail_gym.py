@@ -31,8 +31,8 @@ parser.add_argument('--env-name', default="CrowdSim-v0", metavar='G',
                     help='name of the environment to run')
 parser.add_argument('--expert-traj-path', default="starting_assets/rgl_expert_traj.p", metavar='G',
                     help='path of the expert trajectories')
-parser.add_argument('--render', action='store_true', default=False,
-                    help='render the environment')
+parser.add_argument('--render', type=int, default=0,
+                    help='renders the environment every n runs the environment, 0 for no render')
 parser.add_argument('--save-render', action='store_false', default=True,
                     help='Save and log the runs as gifs')
 parser.add_argument('--log-std', type=float, default=-0.0, metavar='G',
@@ -82,6 +82,8 @@ parser.add_argument('--relative', default='xy',
                     help='Train agent on relative position of agents, options are [xy] and [polar], anything else will be none')
 parser.add_argument('--reverse', action='store_true', default=False,
                     help='Allow robot to reverse in unicycle mode (default: False)')
+parser.add_argument('--heatmap', action='store_true', default=False,
+                    help='Render a heatmap of the value network (default: False)')
 args = parser.parse_args()
 
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
@@ -118,7 +120,7 @@ else:
 env = None
 robot = None
 if args.env_name == 'CrowdSim-v0':
-    env = CrowdSim()
+    env = CrowdSim(args.heatmap)
     env_config = gail.EnvConfig(True)
     env.configure(env_config)
     

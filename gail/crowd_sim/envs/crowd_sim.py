@@ -24,7 +24,7 @@ from gail.crowd_sim.envs.utils.utils import point_to_segment_dist
 class CrowdSim(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self):
+    def __init__(self, heatmap):
         """
         Movement simulation for n+1 agents
         Agent can either be human or robot.
@@ -90,7 +90,7 @@ class CrowdSim(gym.Env):
         self.phase = None
 
         #Heatmap
-        self.heatmap = True
+        self.heatmap = heatmap
         self.values = []
 
     def configure(self, config):
@@ -307,7 +307,6 @@ class CrowdSim(gym.Env):
         for i, human in enumerate(self.humans):
             px = human.px - self.robot.px
             py = human.py - self.robot.py
-            # print(action)
             if self.robot.kinematics == 'holonomic':
                 vx = human.vx - action[0] #human[0] - action[0]
                 vy = human.vy - action[1] #human[1] - action[1]
@@ -390,8 +389,6 @@ class CrowdSim(gym.Env):
             self.robot_actions.append(action)
             self.robot_v.append([self.robot.vx, self.robot.vy])
             self.rewards.append(reward)
-            # print(action)
-            # print(self.robot_actions[-1])
 
             # compute the observation
             if self.robot.sensor == 'coordinates':
@@ -403,37 +400,57 @@ class CrowdSim(gym.Env):
                 ob = [human.get_next_observable_state(action) for human, action in zip(self.humans, human_actions)]
             elif self.robot.sensor == 'RGB':
                 raise NotImplementedError
-        # print("True" if done else "False")
 
         if self.heatmap and update and step_heatmap:
             fidelity = 5
             actions_1 = range(fidelity)
             actions_2 = range(fidelity)
             vals = np.empty((fidelity, fidelity))
+            states = None
+        
+            for a1 in actions_1:
+                for a2 in actions_2:                            
+                    action = None
+                    if self.robot.kinematics == 'holonomic':
+                        vx = (a1)/(fidelity-1)*2-1
+                        vy = (a2)/(fidelity-1)*2-1
+                        action = ActionXY(vx, vy)
+                    else:
+                        speed = (a1)/(fidelity-1)*2-1
+                        rotation = (a2)/(fidelity-1)*2-1
+                        action = ActionRot(speed, rotation)
+                    
+                    human_state, reward, done, _ = self.onestep_lookahead(action)
+                    r = self.robot.get_full_state()
+                    
+                    pos = self.robot.compute_position(action, 0.25)
+                    r.px, r.py = pos
 
+                    if self.robot.kinematics == 'holonomic':
+                        r.vx = action.vx
+                        r.vy = action.vy
+                    else:
+                        #The rotation of the robot is reduced by self.max_rot by default np.pi/10
+                        r.theta = (self.theta + action.r*self.max_rot) % (2 * np.pi)
+
+                        r.vx = action.v * np.cos(self.theta)
+                        r.vy = action.v * np.sin(self.theta)
+                        
+                    joint_state = JointState(r, human_state)
+                    
+                    r_tensor, h_tensor = joint_state.to_tensor()
+                    state = torch.hstack([torch.flatten(r_tensor), torch.flatten(h_tensor)])
+
+                    states = state if states == None else torch.vstack((states, state))
             with torch.no_grad():
-                for a1 in actions_1:
-                    for a2 in actions_2:                            
-                        action = None
-                        if self.robot.kinematics == 'holonomic':
-                            vx = (a1+1)/5*2-1
-                            vy = (a2+1)/5*2-1
-                            action = ActionXY(vx, vy)
-                        else:
-                            speed = (a1+1)/5*2-1
-                            rotation = (a2+1)/5*2-1
-                            action = ActionRot(speed, rotation)
-                        
-                        human_state, reward, done, _ = self.onestep_lookahead(action)
-                        r = self.robot.get_full_state()
-                        joint_state = JointState(r, human_state)
-                        
-                        r_tensor, h_tensor = joint_state.to_tensor()
-                        val = self.robot.value(torch.hstack([torch.flatten(r_tensor), torch.flatten(h_tensor)]))
-
-                        vals[a1][a2] = val.numpy()
-
-            self.values.append(vals)
+                vals = self.robot.value(states)
+                    # print(f'{val}, {action}')
+                    # input()
+                # print(vals.shape)
+                # print(states.shape)
+                vals = torch.reshape(vals, (fidelity, fidelity))
+                # print(vals.shape)
+                self.values.append(vals.numpy())
 
         return ob, reward, done, info
 
@@ -455,31 +472,6 @@ class CrowdSim(gym.Env):
 
     def render(self, mode='video', output_file=None, heatmap=False, maximised=True):
 
-        def plot_value_heatmap(ax):
-            fidelity = 5
-            speeds = range(fidelity)
-            rotations = range(fidelity)
-
-            # when any key is pressed draw the action value plot
-            # fig, axis = plt.subplots()
-            # speeds = [0] + speeds
-            # rotations = rotations + [np.pi * 2]
-            r, th = np.meshgrid(speeds, rotations)
-            z = np.array(self.values[0])
-            z = z / np.linalg.norm(z)
-            z = np.reshape(z, (fidelity, fidelity))
-            plot = plt.subplot()
-            # plot = plt.subplot(projection="polar")
-            plot.tick_params(labelsize=16)
-            mesh = ax.pcolormesh(th, r, z, vmin=0, vmax=1)
-            ax.plot(rotations, r, color='k', ls='none')
-            ax.grid()
-            # cbaxes = fig.add_axes([0.85, 0.1, 0.03, 0.8])
-            # cbar = ax.colorbar(mesh, cax=cbaxes)
-            # cbar.ax.tick_params(labelsize=16)
-            # ax.show()
-
-
         from matplotlib import animation
         import matplotlib.pyplot as plt
         # plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
@@ -491,7 +483,11 @@ class CrowdSim(gym.Env):
         display_numbers = False
 
         if mode == 'traj':
-            fig, (ax, hm) = plt.subplots(nrows=1, ncols=2, figsize=(7, 7))
+            if self.heatmap:
+                fig, (ax, hm) = plt.subplots(nrows=1, ncols=2, figsize=(7, 7))
+            else:
+                fig, ax = plt.subplots(figsize=(7, 7))
+            
             ax.tick_params(labelsize=16)
             ax.set_xlim(-5, 5)
             ax.set_ylim(-5, 5)
@@ -547,7 +543,11 @@ class CrowdSim(gym.Env):
             plt.legend([robot], ['Robot'], fontsize=16)
             plt.show()
         elif mode == 'video':
-            fig, (ax, hm) = plt.subplots(nrows=1, ncols=2, figsize=(7, 7))
+            if self.heatmap:
+                fig, (ax, hm) = plt.subplots(nrows=1, ncols=2, figsize=(14, 7))
+            else:
+                fig, ax = plt.subplots(figsize=(7, 7))
+
             ax.tick_params(labelsize=12)
             ax.set_xlim(-11, 11)
             ax.set_ylim(-11, 11)
@@ -597,8 +597,8 @@ class CrowdSim(gym.Env):
 
             for i, human in enumerate(humans):
                 ax.add_artist(human)
-                # if display_numbers:
-                #     ax.add_artist(human_numbers[i])
+                if display_numbers and not self.heatmap:
+                    ax.add_artist(human_numbers[i])
 
             # add time annotation
             time = plt.text(0.4, 0.95, 'Time: {}'.format(0), fontsize=10, transform=ax.transAxes)
@@ -606,12 +606,12 @@ class CrowdSim(gym.Env):
             reward_sum = plt.text(0.01, 0.9, 'Reward Sum: {}'.format(0), fontsize=10, transform=ax.transAxes)
             action = plt.text(0.01, 0.85, 'Action: [{},{}]'.format(0,0), fontsize=10, transform=ax.transAxes)
 
-            # ax.add_artist(time)
-            # ax.add_artist(reward)
-            # ax.add_artist(reward_sum)
-            # ax.add_artist(action)
+            if not self.heatmap:
+                ax.add_artist(time)
+                ax.add_artist(reward)
+                ax.add_artist(reward_sum)
+                ax.add_artist(action)
 
-            # plot_value_heatmap(hm)
             # compute orientation in each step and use arrow to show the direction
             radius = self.robot.radius
             orientations = []
@@ -690,10 +690,7 @@ class CrowdSim(gym.Env):
                 action.set_text('Action: [{:.2f},{:.2f}]'.format(self.robot_v[frame_num][0],self.robot_v[frame_num][1]))
 
                 if self.heatmap:
-                    # img = self.values.frame
                     hm.imshow(self.values[frame_num], cmap='hot', interpolation='nearest')
-
-                    print(self.values[frame_num])
 
                 if len(self.trajs) != 0:
                     for i, circles in enumerate(human_future_circles):
@@ -721,37 +718,22 @@ class CrowdSim(gym.Env):
                     print('X is: ')
                     print(self.Xs[global_step])
 
-            def on_click(event):
-                if anim.running:
-                    anim.event_source.stop()
-                    if event.key == 'a':
-                        if hasattr(self.robot.policy, 'get_matrix_A'):
-                            print_matrix_A()
-                        if hasattr(self.robot.policy, 'get_feat'):
-                            print_feat()
-                        if hasattr(self.robot.policy, 'get_X'):
-                            print_X()
-                        if hasattr(self.robot.policy, 'action_values'):
-                            plot_value_heatmap()
-
-                else:
-                    anim.event_source.start()
-                anim.running ^= True
-
-            # fig.canvas.mpl_connect('key_press_event', on_click)
-            anim = animation.FuncAnimation(fig, update, frames=len(self.states), interval=self.time_step * 500)
+            anim = animation.FuncAnimation(fig, update, frames=len(self.states), interval=self.time_step*500, blit=False, repeat=True)
             anim.running = True
 
-            # output_file = open('assets/test.gif', 'wb')
+            #output_file = None #open('assets/test.gif', 'wb')
 
             if output_file is not None:
                 # save as video
-                # ffmpeg_writer = animation.FFMpegWriter(fps=10, metadata=dict(artist='Me'), bitrate=1800)
+                # imagemagick_writer = animation.ImageMagickWriter(fps=12,metadata=dict(artist='Me'),bitrate=1800, codec='libx264')
+                ffmpeg_writer = animation.FFMpegWriter(fps=12, metadata=dict(artist='Me'), bitrate=1800)
                 # writer = ffmpeg_writer(fps=10, metadata=dict(artist='Me'), bitrate=1800)
                 #anim.save(output_file, writer=ffmpeg_writer)
 
                 # save output file as gif if imagemagic is installed
-                anim.save(output_file, writer='imagemagic', fps=12)
+                # anim.save(output_file, writer='imagemagic', fps=12)
+                anim.save(output_file.name, writer=ffmpeg_writer)
+
                 output_file.close()
             else:
                 if maximised:
