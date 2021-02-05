@@ -24,7 +24,7 @@ from gail.crowd_sim.envs.utils.utils import point_to_segment_dist
 class CrowdSim(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, heatmap):
+    def __init__(self, heatmap, device):
         """
         Movement simulation for n+1 agents
         Agent can either be human or robot.
@@ -91,6 +91,7 @@ class CrowdSim(gym.Env):
 
         #Heatmap
         self.heatmap = heatmap
+        self.device = device
         self.values = []
 
     def configure(self, config):
@@ -443,13 +444,9 @@ class CrowdSim(gym.Env):
 
                     states = state if states == None else torch.vstack((states, state))
             with torch.no_grad():
+                states.to(self.device)
                 vals = self.robot.value(states)
-                    # print(f'{val}, {action}')
-                    # input()
-                # print(vals.shape)
-                # print(states.shape)
                 vals = torch.reshape(vals, (fidelity, fidelity))
-                # print(vals.shape)
                 self.values.append(vals.numpy())
 
         return ob, reward, done, info

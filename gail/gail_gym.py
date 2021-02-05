@@ -120,7 +120,7 @@ else:
 env = None
 robot = None
 if args.env_name == 'CrowdSim-v0':
-    env = CrowdSim(args.heatmap)
+    env = CrowdSim(args.heatmap, device)
     env_config = gail.EnvConfig(True)
     env.configure(env_config)
     
