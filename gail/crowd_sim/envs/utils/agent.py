@@ -84,6 +84,7 @@ class Agent(object):
         pos = self.compute_position(action, self.time_step)
         next_px, next_py = pos
         if self.kinematics == 'holonomic':
+            next_theta = self.theta
             next_vx = action.vx
             next_vy = action.vy
         else:

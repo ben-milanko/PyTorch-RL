@@ -225,7 +225,8 @@ def update_params(batch, i_iter):
     for _ in range(optim_epochs):
         perm = np.arange(states.shape[0])
         np.random.shuffle(perm)
-        perm = LongTensor(perm).to(device)
+        perm = torch.tensor(perm).to(device)
+        # perm = LongTensor(perm).to(device)
 
         states, actions, returns, advantages, fixed_log_probs = \
             states[perm].clone(), actions[perm].clone(), returns[perm].clone(), advantages[perm].clone(), fixed_log_probs[perm].clone()

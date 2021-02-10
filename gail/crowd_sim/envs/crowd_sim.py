@@ -261,6 +261,9 @@ class CrowdSim(gym.Env):
         self.robot_actions = list()
         self.robot_v = list()
         self.rewards = list()
+
+        self.values = list()
+
         if hasattr(self.robot.policy, 'action_values'):
             self.action_values = list()
         if hasattr(self.robot.policy, 'get_attention_weights'):
@@ -280,6 +283,7 @@ class CrowdSim(gym.Env):
         elif self.robot.sensor == 'RGB':
             raise NotImplementedError
         # print(ob)
+
         return ob
 
     def onestep_lookahead(self, action):
@@ -406,7 +410,6 @@ class CrowdSim(gym.Env):
             fidelity = 5
             actions_1 = range(fidelity)
             actions_2 = range(fidelity)
-            vals = np.empty((fidelity, fidelity))
             states = None
         
             for a1 in actions_1:
@@ -431,10 +434,12 @@ class CrowdSim(gym.Env):
 
                     states = state if states == None else torch.vstack((states, state))
             with torch.no_grad():
-                states.to(self.device)
-                self.robot.value.to(self.device)
-
+                # states.to(torch.device('cpu'))
+                # self.robot.value.to(self.device)
+                self.robot.value.to(torch.device('cpu'))
                 vals = self.robot.value(states)
+                self.robot.value.to(self.device)
+                
                 vals = torch.reshape(vals, (fidelity, fidelity))
                 self.values.append(vals.numpy())
 
@@ -676,6 +681,7 @@ class CrowdSim(gym.Env):
                 action.set_text('Action: [{:.2f},{:.2f}]'.format(self.robot_v[frame_num][0],self.robot_v[frame_num][1]))
 
                 if self.heatmap:
+                    print(f'{len(self.values)}, {frame_num}, {len(self.robot_v)}')
                     hm.imshow(self.values[frame_num], cmap='hot', interpolation='nearest')
 
                 if len(self.trajs) != 0:
