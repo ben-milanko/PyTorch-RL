@@ -2,6 +2,7 @@ import logging
 import random
 import math
 import torch
+import pickle
 
 import gym
 from gym import error, spaces, utils
@@ -24,7 +25,7 @@ from gail.crowd_sim.envs.utils.utils import point_to_segment_dist
 class CrowdSim(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, heatmap, device):
+    def __init__(self, heatmap, device, trajnet):
         """
         Movement simulation for n+1 agents
         Agent can either be human or robot.
@@ -93,6 +94,10 @@ class CrowdSim(gym.Env):
         self.heatmap = heatmap
         self.device = device
         self.values = []
+
+        #Trajnet
+        self.trajnet = trajnet
+        self.trajnet_samples = pickle.load(open(trajnet, 'rb'))
 
     def configure(self, config):
         self.config = config
