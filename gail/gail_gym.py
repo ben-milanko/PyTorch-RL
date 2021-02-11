@@ -84,7 +84,7 @@ parser.add_argument('--reverse', action='store_true', default=False,
                     help='Allow robot to reverse in unicycle mode (default: False)')
 parser.add_argument('--heatmap', action='store_true', default=False,
                     help='Render a heatmap of the value network (default: False)')
-parser.add_argument('--trajnet', default='assets/trajnet/reordered_bookstore_0.p',
+parser.add_argument('--trajnet', default='trajnet/reordered_bookstore.p',
                     help='Location of trajnet path for human trajectories (default: assets/trajnet/reordered_bookstore_0.p)')
 args = parser.parse_args()
 
@@ -121,8 +121,9 @@ else:
 """environment"""
 env = None
 robot = None
+
 if args.env_name == 'CrowdSim-v0':
-    env = CrowdSim(args.heatmap, device, args.trajnet)
+    env = CrowdSim(args.heatmap, device, args.trajnet if args.trajnet != '' else None)
     env_config = gail.EnvConfig(True)
     env.configure(env_config)
     

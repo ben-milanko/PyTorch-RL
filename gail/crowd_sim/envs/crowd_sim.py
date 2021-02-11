@@ -3,6 +3,7 @@ import random
 import math
 import torch
 import pickle
+from operator import itemgetter
 
 import gym
 from gym import error, spaces, utils
@@ -96,6 +97,8 @@ class CrowdSim(gym.Env):
         self.values = []
 
         #Trajnet
+        self.frame = 0
+        self.global_frame = 0
         self.trajnet = trajnet
         self.trajnet_samples = pickle.load(open(trajnet, 'rb'))
 
@@ -206,6 +209,7 @@ class CrowdSim(gym.Env):
         if test_case is not None:
             self.case_counter[phase] = test_case
         self.global_time = 0
+        self.frame = 0
 
         base_seed = {'train': self.case_capacity['val'] + self.case_capacity['test'],
                      'val': 0, 'test': self.case_capacity['val']}
@@ -388,12 +392,49 @@ class CrowdSim(gym.Env):
 
             # update all agents            
             self.robot.step(action)
-            for human, action_human in zip(self.humans, human_actions):
-                human.step(action_human)
-                if self.nonstop_human and human.reached_destination():
-                    self.generate_human(human)
+
+            # Applying the trajnet movement to humans in the sim
+            if self.trajnet:
+                sample = self.trajnet_samples[self.global_frame]
+
+                #Sorting the sample to get the 5 closest humans to the robot
+                for i in range(len(sample)):
+                    dist = np.sqrt(np.square(self.robot.px-float(sample[i][1]))+np.square(self.robot.py-float(sample[i][2])))
+                    sample[i].append(dist)
+
+                sample = sorted(sample, key=itemgetter(3))
+                sample = sample[:self.human_num-1]
+
+                
+                for i in range(len(self.humans)):
+                    # Preserving the position
+                    pos_set = False
+                    # if self.humans[i].human_id != None:
+                    #     for human_sample in sample:
+                    #         if human_sample[0] == self.humans[i].human_id:
+                    #             self.humans[i].set_position([float(human_sample[1])/2, float(human_sample[2])/2])
+                    #             pos_set = True
+
+                    if not pos_set:
+                        if len(sample) > i:
+                            self.humans[i].human_id = sample[i][0]
+                            self.humans[i].set_position([float(sample[i][1])/2, float(sample[i][2])/2])
+                        else:
+                            self.humans[i].set_position([-10000, -10000])
+            else:
+                for human, action_human in zip(self.humans, human_actions):
+                    human.step(action_human)
+                    if self.nonstop_human and human.reached_destination():
+                        self.generate_human(human)
 
             self.global_time += self.time_step
+            if (self.global_frame >= len(self.trajnet_samples)-1):
+                self.frame = 0
+                self.global_frame = 0
+            else:
+                self.frame += 1
+                self.global_frame += 1
+
             self.states.append([self.robot.get_full_state(), [human.get_full_state() for human in self.humans],
                                 [human.id for human in self.humans]])
             self.robot_actions.append(action)
@@ -439,15 +480,13 @@ class CrowdSim(gym.Env):
 
                     states = state if states == None else torch.vstack((states, state))
             with torch.no_grad():
-                # states.to(torch.device('cpu'))
-                # self.robot.value.to(self.device)
                 self.robot.value.to(torch.device('cpu'))
                 vals = self.robot.value(states)
                 self.robot.value.to(self.device)
                 
                 vals = torch.reshape(vals, (fidelity, fidelity))
                 self.values.append(vals.numpy())
-
+        
         return ob, reward, done, info
 
     def compute_observation_for(self, agent):
@@ -541,6 +580,11 @@ class CrowdSim(gym.Env):
         elif mode == 'video':
             if self.heatmap:
                 fig, (ax, hm) = plt.subplots(nrows=1, ncols=2, figsize=(14, 7))
+                hm.tick_params(labelsize=12)
+                hm.set_xlim(-1, 1)
+                hm.set_ylim(-1, 1)
+                hm.set_xlabel('x action', fontsize=14)
+                hm.set_ylabel('y action', fontsize=14)
             else:
                 fig, ax = plt.subplots(figsize=(7, 7))
 
@@ -677,16 +721,16 @@ class CrowdSim(gym.Env):
 
                 for arrow in arrows:
                     ax.add_artist(arrow)
-                    # if hasattr(self.robot.policy, 'get_attention_weights'):
-                    #     attention_scores[i].set_text('human {}: {:.2f}'.format(i, self.attention_weights[frame_num][i]))
-
+                    
                 time.set_text('Time: {:.2f}'.format(frame_num * self.time_step))
                 reward.set_text('Reward: {:.2f}'.format(self.rewards[frame_num]))
                 reward_sum.set_text('Reward Sum: {:.2f}'.format(sum(self.rewards[0:frame_num])))
                 action.set_text('Action: [{:.2f},{:.2f}]'.format(self.robot_v[frame_num][0],self.robot_v[frame_num][1]))
 
                 if self.heatmap:
-                    print(f'{len(self.values)}, {frame_num}, {len(self.robot_v)}')
+                    # print(self.values[frame_num])
+                    # input()
+                    # print(f'{len(self.values)}, {frame_num}, {len(self.robot_v)}')
                     hm.imshow(self.values[frame_num], cmap='hot', interpolation='nearest')
 
                 if len(self.trajs) != 0:
