@@ -1,5 +1,6 @@
 import argparse
 import logging
+from math import nan
 import gym
 import os
 import sys
@@ -91,6 +92,8 @@ args = parser.parse_args()
 expert_name = args.expert_traj_path.split('/')[-1].split('.')[0]
 starting_model = args.model_path.split('/')[-1].split('.')[0]
 kinematics = 'holonomic' if args.holonomic else 'unicycle'
+trajnet = args.trajnet if args.trajnet != '' else None
+
 tags = [
         f'steps:{args.max_iter_num}',
         f'expert:{expert_name}',
@@ -98,6 +101,8 @@ tags = [
         f'reward:mixed',
         f'relative:{args.relative}',
         f'rotation_clamp:{args.robot_rot:0.2f}',
+        f'trajnet:{trajnet}',
+        f'heatmap:{args.heatmap}'
         f'reverse:{args.reverse}',
         f'action_clamp:tanh',
         f'goal_randomisation:{args.env_rand}',
@@ -106,7 +111,6 @@ tags = [
     ]
 print(f'Tags: {tags}')
 if not args.no_wandb: wandb.init(project='crowd_rl', name=f'GAIL {args.wandb_description}',tags=tags)
-
 
 dtype = torch.float64
 torch.set_default_dtype(dtype)
@@ -123,7 +127,7 @@ env = None
 robot = None
 
 if args.env_name == 'CrowdSim-v0':
-    env = CrowdSim(args.heatmap, device, args.trajnet if args.trajnet != '' else None)
+    env = CrowdSim(args.heatmap, device, trajnet)
     env_config = gail.EnvConfig(True)
     env.configure(env_config)
     
@@ -154,7 +158,7 @@ torch.manual_seed(args.seed)
 env.seed(args.seed)
 
 """define actor and critic"""
-if args.model_path is None:
+if args.model_path == '':
     if is_disc_action:
         policy_net = DiscretePolicy(state_dim, env.action_space.n)
     else:
@@ -192,7 +196,11 @@ expert_traj = pickle.load(open("expert_traj.p", "rb"))
 def expert_reward(state, action):
     state_action = tensor(np.hstack([state, action]), dtype=dtype)
     with torch.no_grad():
-        return -math.log(discrim_net(state_action)[0].item())
+        # print(state_action.shape)
+        # state_action = torch.unsqueeze(state_action, 0) # state_action
+        # state_action = torch.unsqueeze(state_action, 0)
+        # print(state_action.shape)
+        return -math.log(discrim_net(state_action)[0].item()) # if not nan else 1
 
 
 """create agent"""
@@ -218,6 +226,9 @@ def update_params(batch, i_iter):
         g_o = discrim_net(torch.cat([states, actions], 1))
         e_o = discrim_net(expert_state_actions)
         optimizer_discrim.zero_grad()
+
+        # g_o[g_o != g_o] = torch.scalar_tensor(1)
+        # print(f'{torch.max(g_o)}, {torch.min(g_o)}, {torch.max(e_o)}, {torch.min(e_o)}')
         discrim_loss = discrim_criterion(g_o, ones((states.shape[0], 1), device=device)) + \
             discrim_criterion(e_o, zeros((expert_state_actions.shape[0], 1), device=device))
         discrim_loss.backward()
@@ -273,10 +284,10 @@ def main_loop():
             
             print('Saving model to: ' + os.path.join(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p'))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
-            pickle.dump((policy_net, value_net, discrim_net), open(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p', 'wb'))
+            pickle.dump((policy_net, value_net, discrim_net), open(f'assets/learned_models/{args.env_name}_gail{(i_iter+1):0{len(str(args.max_iter_num))}}.p', 'wb'))
             to_device(device, policy_net, value_net, discrim_net)
 
-            if not args.no_wandb: wandb.save(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p')
+            if not args.no_wandb: wandb.save(f'assets/learned_models/{args.env_name}_gail{(i_iter+1):0{len(str(args.max_iter_num))}}.p')
 
         """clean up gpu memory"""
         torch.cuda.empty_cache()
