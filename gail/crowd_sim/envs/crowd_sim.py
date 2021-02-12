@@ -713,9 +713,9 @@ class CrowdSim(gym.Env):
             # save as video
             if heatmap:
                 writer = animation.FFMpegWriter(fps=12, metadata=dict(artist='Me'), bitrate=1800)
+                anim.save(output_file.name, writer=writer)
             else:
-                writer = animation.ImageMagickWriter(fps=12,metadata=dict(artist='Me'),bitrate=1800, codec='libx264')
-            anim.save(output_file.name, writer=writer)
+                anim.save(output_file.name, fps=12)
 
             output_file.close()
         else:
