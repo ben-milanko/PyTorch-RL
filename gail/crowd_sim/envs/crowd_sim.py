@@ -711,14 +711,11 @@ class CrowdSim(gym.Env):
 
         if output_file is not None:
             # save as video
-            # imagemagick_writer = animation.ImageMagickWriter(fps=12,metadata=dict(artist='Me'),bitrate=1800, codec='libx264')
-            ffmpeg_writer = animation.FFMpegWriter(fps=12, metadata=dict(artist='Me'), bitrate=1800)
-            # writer = ffmpeg_writer(fps=10, metadata=dict(artist='Me'), bitrate=1800)
-            #anim.save(output_file, writer=ffmpeg_writer)
-
-            # save output file as gif if imagemagic is installed
-            # anim.save(output_file, writer='imagemagic', fps=12)
-            anim.save(output_file.name, writer=ffmpeg_writer)
+            if heatmap:
+                writer = animation.FFMpegWriter(fps=12, metadata=dict(artist='Me'), bitrate=1800)
+            else:
+                writer = animation.ImageMagickWriter(fps=12,metadata=dict(artist='Me'),bitrate=1800, codec='libx264')
+            anim.save(output_file.name, writer=writer)
 
             output_file.close()
         else:

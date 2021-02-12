@@ -198,7 +198,7 @@ class BasicRobot(Agent):
         self.theta = None
         self.time_step = None
         
-        self.sensor_radius = 10
+        self.sensor_radius = 15
 
         #Policy is required to pass asserts later, it isn't used at all due to the custom act
         self.policy = BasicPolicy()
