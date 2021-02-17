@@ -412,11 +412,11 @@ class CrowdSim(gym.Env):
                 for i in range(len(self.humans)):
                     # Preserving the position
                     pos_set = False
-                    # if self.humans[i].human_id != None:
-                    #     for human_sample in sample:
-                    #         if human_sample[0] == self.humans[i].human_id:
-                    #             self.humans[i].set_position([float(human_sample[1])/2, float(human_sample[2])/2])
-                    #             pos_set = True
+                    if self.humans[i].human_id != None:
+                        for human_sample in sample:
+                            if human_sample[0] == self.humans[i].human_id:
+                                self.humans[i].set_position([float(human_sample[1]), float(human_sample[2])])
+                                pos_set = True
 
                     if not pos_set:
                         if len(sample) > i:
@@ -662,7 +662,7 @@ class CrowdSim(gym.Env):
         def update(frame_num):
             nonlocal global_step
             nonlocal arrows
-            # nonlocal rect
+            nonlocal rect
             
             global_step = frame_num
             robot.center = robot_positions[frame_num]
@@ -693,10 +693,7 @@ class CrowdSim(gym.Env):
             action.set_text('Action: [{:.2f},{:.2f}]'.format(self.robot_v[frame_num][0],self.robot_v[frame_num][1]))
 
             if self.heatmap:
-                rect.remove()
-                rect = patches.Rectangle((self.robot_v[frame_num][0], self.robot_v[frame_num][1]), 0.3, 0.3, linewidth=1, edgecolor='r', facecolor='none')
-                hm.add_patch(rect)
-
+                rect.center = ((self.robot_v[frame_num][0], self.robot_v[frame_num][1]))
                 hm.imshow(self.values[frame_num], cmap='hot', interpolation='nearest')
 
             if len(self.trajs) != 0:
