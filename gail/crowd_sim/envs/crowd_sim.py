@@ -401,9 +401,7 @@ class CrowdSim(gym.Env):
                 #Sorting the sample to get the 5 closest humans to the robot
                 for i in range(len(sample)):
                     dist = np.sqrt(np.square(self.robot.px-float(sample[i][1]))+np.square(self.robot.py-float(sample[i][2])))
-                    # if dist < self.robot.sensor_radius:
                     sample[i].append(dist)
-                        # sample.append(sample[i])
 
                 sample = sorted(sample, key=itemgetter(3))
                 sample = sample[:self.human_num-1]
@@ -412,11 +410,11 @@ class CrowdSim(gym.Env):
                 for i in range(len(self.humans)):
                     # Preserving the position
                     pos_set = False
-                    if self.humans[i].human_id != None:
-                        for human_sample in sample:
-                            if human_sample[0] == self.humans[i].human_id:
-                                self.humans[i].set_position([float(human_sample[1]), float(human_sample[2])])
-                                pos_set = True
+                    # if self.humans[i].human_id != None:
+                    #     for human_sample in sample:
+                    #         if human_sample[0] == self.humans[i].human_id and human_sample[3] < self.robot.sensor_radius:
+                    #             self.humans[i].set_position([float(human_sample[1]), float(human_sample[2])])
+                    #             pos_set = True
 
                     if not pos_set:
                         if len(sample) > i:
@@ -580,7 +578,6 @@ class CrowdSim(gym.Env):
                                 markersize=15, label='Goal')
         robot = plt.Circle(robot_positions[0], self.robot.radius, fill=False, color=robot_color)
         robot_sensor = plt.Circle(robot_positions[0], self.robot.sensor_radius, fill=False, color=robot_sensor_color)
-
 
         ax.add_artist(robot)
         ax.add_artist(robot_sensor)

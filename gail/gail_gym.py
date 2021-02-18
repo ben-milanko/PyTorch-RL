@@ -280,7 +280,7 @@ def main_loop():
             if args.save_render:
                 print(f'Saving renders to: assets/renders/episode_{i_iter+1}')
                 agent.collect_samples(args.min_batch_size, render=args.render, multiprocessing=args.multiprocessing, save_render=True, iter=i_iter+1)
-                if not args.no_wandb: wandb.log({f'episode_{(i_iter+1):0{len(str(args.max_iter_num))}}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i}.gif', fps=12, format="gif") for i in range(5)]})
+                if not args.no_wandb: wandb.log({f'episode_{(i_iter+1):0{len(str(args.max_iter_num))}}': [wandb.Video(f'assets/renders/episode_{i_iter+1}/sample_{i}.mp4', fps=12, format="gif") for i in range(5)]})
             
             print('Saving model to: ' + os.path.join(f'assets/learned_models/{args.env_name}_gail{i_iter+1}.p'))
             to_device(torch.device('cpu'), policy_net, value_net, discrim_net)
